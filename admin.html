@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — Sen Grocery Store</title>
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#0A2540",
+            accent:  "#2EC4B6",
+            bglight: "#F8F9FA",
+          },
+          fontFamily: {
+            poppins: ["Poppins", "sans-serif"],
+            inter:   ["Inter",   "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: "Inter", sans-serif; background: #F8F9FA; -webkit-font-smoothing: antialiased; }
+
+    /* ── Input ── */
+    .admin-input {
+      display: block; width: 100%;
+      padding: 0.65rem 0.875rem;
+      border-radius: 8px; border: 1.5px solid #e5e7eb;
+      background: #fff; font-size: 0.875rem; color: #1A1A1A;
+      font-family: "Inter", sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+    }
+    .admin-input:focus { border-color: #2EC4B6; box-shadow: 0 0 0 3px rgba(46,196,182,0.18); }
+
+    /* ── Small action button ── */
+    .btn-admin-sm {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      border-radius: 7px; border-width: 1px; border-style: solid;
+      font-size: 0.75rem; font-weight: 600;
+      transition: all 0.15s; cursor: pointer; white-space: nowrap;
+    }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(10,37,64,0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .modal-box {
+      background: #fff; border-radius: 16px;
+      width: 100%; max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      overflow-y: auto; max-height: 90vh;
+    }
+
+    /* ── Progress bar ── */
+    .progress-track {
+      height: 6px; background: #e5e7eb;
+      border-radius: 3px; overflow: hidden; margin-top: 0.5rem;
+    }
+    .progress-fill {
+      height: 100%; background: #2EC4B6;
+      border-radius: 3px; width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* ── Active tab ── */
+    [data-tab].border-accent { border-color: #2EC4B6 !important; }
+  </style>
+</head>
+
+<body class="bg-bglight min-h-screen font-inter">
+
+  <!-- ════════════════════════════════════════════
+       LOGIN SCREEN
+  ═════════════════════════════════════════════ -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+      <div class="text-center mb-8">
+        <div class="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <span class="text-accent font-extrabold text-2xl font-poppins">S</span>
+        </div>
+        <h1 class="text-2xl font-bold text-primary font-poppins">Admin Panel</h1>
+        <p class="text-gray-500 text-sm mt-1">Sen Grocery Store — Authorised Access Only</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-7">
+        <form id="login-form" novalidate>
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Email</label>
+            <input id="login-email" type="email" class="admin-input" placeholder="admin@example.com"
+                   autocomplete="email" required />
+          </div>
+          <div class="mb-5">
+            <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Password</label>
+            <input id="login-pass" type="password" class="admin-input" placeholder="••••••••"
+                   autocomplete="current-password" required />
+          </div>
+          <p id="login-error" class="text-red-500 text-sm font-medium mb-3"></p>
+          <button id="login-btn" type="submit"
+                  class="w-full bg-primary text-white font-semibold font-poppins py-3 rounded-xl hover:bg-primary/90 transition-colors">
+            Sign In
+          </button>
+        </form>
+      </div>
+      <p class="text-center text-xs text-gray-400 mt-4">© 2025 Sen Grocery Store</p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       ADMIN PANEL
+  ═════════════════════════════════════════════ -->
+  <div id="admin-panel" class="hidden min-h-screen">
+
+    <!-- Top bar -->
+    <header class="bg-primary shadow-lg sticky top-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
+            <span class="text-white font-extrabold font-poppins text-base leading-none">S</span>
+          </div>
+          <div>
+            <span class="text-white font-bold font-poppins text-sm sm:text-base">Admin Panel</span>
+            <span class="hidden sm:block text-accent text-[10px] font-medium tracking-wider">SEN GROCERY STORE</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="admin-user-email" class="hidden sm:block text-gray-400 text-xs truncate max-w-[160px]"></span>
+          <button id="logout-btn"
+                  class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors font-poppins">
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tab navigation -->
+    <div class="bg-white border-b border-gray-200 sticky top-16 z-30 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex gap-0 overflow-x-auto scrollbar-none">
+          <button data-tab="settings"   class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⚙️ Settings</button>
+          <button data-tab="categories" class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🏷️ Categories</button>
+          <button data-tab="products"   class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🛒 Products</button>
+          <button data-tab="gallery"    class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🖼️ Gallery</button>
+          <button data-tab="reviews"    class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⭐ Reviews</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      <!-- ─────────────────────────────────
+           SETTINGS PANEL
+      ──────────────────────────────────── -->
+      <div data-panel="settings">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 max-w-2xl">
+          <h2 class="text-xl font-bold text-primary font-poppins mb-6">Store Settings</h2>
+
+          <div class="space-y-5">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Hero Tagline</label>
+              <input id="set-tagline" type="text" class="admin-input" placeholder="Trusted Grocery Store Since 1995" />
+              <p class="text-xs text-gray-400 mt-1">Leave empty to use default tagline.</p>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">About Us Text</label>
+              <textarea id="set-about" rows="5" class="admin-input resize-y" placeholder="Your shop story…"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Phone Number</label>
+                <input id="set-phone" type="tel" class="admin-input" placeholder="6296622391" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">WhatsApp Number</label>
+                <input id="set-whatsapp" type="tel" class="admin-input" placeholder="6296622391" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Address</label>
+              <input id="set-address" type="text" class="admin-input" placeholder="Full store address" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Opening Time</label>
+                <input id="set-opentime" type="text" class="admin-input" placeholder="7:00 AM" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Closing Time</label>
+                <input id="set-closetime" type="text" class="admin-input" placeholder="8:00 PM" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Google Maps Link</label>
+              <input id="set-maplink" type="url" class="admin-input" placeholder="https://maps.app.goo.gl/…" />
+            </div>
+          </div>
+
+          <div class="mt-6 flex items-center gap-4">
+            <button id="save-settings-btn" onclick="saveSettings()"
+                    class="bg-primary text-white font-semibold font-poppins px-6 py-2.5 rounded-xl hover:bg-primary/90 transition-colors text-sm">
+              Save Settings
+            </button>
+            <p id="settings-msg" class="text-sm font-medium"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────
+           CATEGORIES PANEL
+      ──────────────────────────────────── -->
+      <div data-panel="categories" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-primary font-poppins">Categories</h2>
+          <button onclick="openCatModal()"
+                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add Category
+          </button>
+        </div>
+        <div id="categories-list" class="space-y-3 max-w-2xl">
+          <p class="text-gray-400 text-sm italic">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────
+           PRODUCTS PANEL
+      ──────────────────────────────────── -->
+      <div data-panel="products" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-primary font-poppins">Products</h2>
+          <button onclick="openProdModal()"
+                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add Product
+          </button>
+        </div>
+        <div id="products-list" class="space-y-3 max-w-2xl">
+          <p class="text-gray-400 text-sm italic">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────
+           GALLERY PANEL
+      ──────────────────────────────────── -->
+      <div data-panel="gallery" class="hidden">
+        <h2 class="text-xl font-bold text-primary font-poppins mb-6">Store Gallery</h2>
+
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-2xl mb-8">
+          <h3 class="font-semibold text-gray-800 font-poppins mb-4 text-sm">Upload from Device</h3>
+          <div class="flex items-center gap-3 flex-wrap">
+            <input id="store-img-file" type="file" accept="image/*"
+                   class="admin-input flex-1 min-w-0 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
+            <button id="upload-gallery-btn" onclick="uploadStoreImage()"
+                    class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex-shrink-0">
+              Upload Image
+            </button>
+          </div>
+          <!-- Progress -->
+          <div id="gallery-prog-wrap" class="hidden mt-3">
+            <div class="progress-track"><div id="gallery-prog-bar" class="progress-fill"></div></div>
+            <p class="text-xs text-gray-400 mt-1">Uploading to Cloudinary…</p>
+          </div>
+
+          <!-- URL fallback -->
+          <div class="mt-5 pt-5 border-t border-gray-100">
+            <p class="text-xs text-gray-500 font-medium mb-2">Or add by direct image URL (fallback)</p>
+            <div class="flex gap-2">
+              <input id="gallery-url-input" type="url" class="admin-input flex-1" placeholder="https://example.com/image.jpg" />
+              <button onclick="addImageByUrl()"
+                      class="flex-shrink-0 border border-accent text-accent font-semibold text-xs px-4 py-2 rounded-lg hover:bg-accent hover:text-white transition-all">
+                Add URL
+              </button>
+            </div>
+          </div>
+
+          <p id="gallery-msg" class="text-sm font-medium mt-3"></p>
+        </div>
+
+        <h3 class="font-semibold text-gray-700 font-poppins mb-4 text-sm">Uploaded Images</h3>
+        <div id="store-images-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <p class="col-span-full text-gray-400 text-sm italic">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ─────────────────────────────────
+           REVIEWS PANEL
+      ──────────────────────────────────── -->
+      <div data-panel="reviews" class="hidden">
+        <h2 class="text-xl font-bold text-primary font-poppins mb-6">Customer Reviews</h2>
+        <div id="reviews-admin-list" class="space-y-4 max-w-2xl">
+          <p class="text-gray-400 text-sm italic">Loading…</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       CATEGORY MODAL
+  ═════════════════════════════════════════════ -->
+  <div id="cat-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6 sm:p-8">
+      <div class="flex items-center justify-between mb-6">
+        <h3 id="cat-modal-title" class="text-lg font-bold text-primary font-poppins">Add Category</h3>
+        <button onclick="closeCatModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="cat-edit-id" />
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Category Name <span class="text-red-400">*</span></label>
+          <input id="cat-name" type="text" class="admin-input" placeholder="e.g. Dairy" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Display Order</label>
+          <input id="cat-order" type="number" class="admin-input" placeholder="1" min="0" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Upload Image</label>
+          <input id="cat-image-file" type="file" accept="image/*"
+                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
+          <div id="cat-prog-wrap" class="hidden mt-2">
+            <div class="progress-track"><div id="cat-prog-bar" class="progress-fill"></div></div>
+            <p class="text-xs text-gray-400 mt-1">Uploading…</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Or Paste Image URL</label>
+          <input id="cat-image-url" type="url" class="admin-input" placeholder="https://…" />
+          <p class="text-xs text-gray-400 mt-1">Used only if no file is selected above.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button id="save-cat-btn" onclick="saveCategoryForm()"
+                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
+          Save
+        </button>
+        <button onclick="closeCatModal()"
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       PRODUCT MODAL
+  ═════════════════════════════════════════════ -->
+  <div id="prod-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6 sm:p-8">
+      <div class="flex items-center justify-between mb-6">
+        <h3 id="prod-modal-title" class="text-lg font-bold text-primary font-poppins">Add Product</h3>
+        <button onclick="closeProdModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="prod-edit-id" />
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Product Name <span class="text-red-400">*</span></label>
+          <input id="prod-name" type="text" class="admin-input" placeholder="e.g. Milk" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Upload Image</label>
+          <input id="prod-image-file" type="file" accept="image/*"
+                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
+          <div id="prod-prog-wrap" class="hidden mt-2">
+            <div class="progress-track"><div id="prod-prog-bar" class="progress-fill"></div></div>
+            <p class="text-xs text-gray-400 mt-1">Uploading…</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Or Paste Image URL</label>
+          <input id="prod-image-url" type="url" class="admin-input" placeholder="https://…" />
+          <p class="text-xs text-gray-400 mt-1">Used only if no file is selected above.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <input id="prod-featured" type="checkbox"
+                 class="w-4 h-4 accent-[#2EC4B6] rounded cursor-pointer" />
+          <label for="prod-featured" class="text-sm font-semibold text-gray-700 font-poppins cursor-pointer">
+            Show as Featured Product on Homepage
+          </label>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button id="save-prod-btn" onclick="saveProductForm()"
+                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
+          Save
+        </button>
+        <button onclick="closeProdModal()"
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- admin.js — ES module -->
+  <script type="module" src="./admin.js"></script>
+</body>
+</html>
