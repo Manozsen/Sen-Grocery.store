@@ -9,8 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ── DOM helper ───────────────────────────────────────────────
-const $  = (id)  => document.getElementById(id);
-const el = (sel) => document.querySelector(sel);
+const $ = (id) => document.getElementById(id);
 
 // ── Fallback data (used when Firebase fails) ─────────────────
 const FALLBACK = {
@@ -23,6 +22,7 @@ const FALLBACK = {
     openTime:  "7:00 AM",
     closeTime: "8:00 PM",
     mapLink:   "https://maps.app.goo.gl/dLS8GtLeGqyk9wKE8",
+    heroImage: "",
   },
   categories: [
     { id: "c1", name: "Dairy",         imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&q=75", order: 1 },
@@ -90,7 +90,7 @@ function spinner() {
   </div>`;
 }
 
-// ── Store open/closed indicator ──────────────────────────────
+// ── Open/closed indicator ─────────────────────────────────────
 function parseTime(t) {
   const m = (t || "").match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return null;
@@ -105,16 +105,31 @@ function parseTime(t) {
 function updateOpenIndicator(openTime, closeTime) {
   const indicator = $("open-indicator");
   if (!indicator) return;
-  const now   = new Date();
-  const cur   = now.getHours() * 60 + now.getMinutes();
-  const open  = parseTime(openTime)  ?? 7 * 60;
-  const close = parseTime(closeTime) ?? 20 * 60;
+  const now    = new Date();
+  const cur    = now.getHours() * 60 + now.getMinutes();
+  const open   = parseTime(openTime)  ?? 7  * 60;
+  const close  = parseTime(closeTime) ?? 20 * 60;
   const isOpen = cur >= open && cur < close;
   indicator.innerHTML = isOpen
     ? `<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>
        <span class="text-green-600 text-sm font-semibold">Open Now</span>`
     : `<span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>
        <span class="text-red-500 text-sm font-semibold">Currently Closed</span>`;
+}
+
+// ── NEW: Apply hero background from Firestore ─────────────────
+// If admin has uploaded a heroImage, apply it as the background.
+// The same gradient overlay is preserved so text stays readable.
+// If heroImage is empty/absent, the CSS .hero-bg class default image is used.
+function applyHeroImage(heroImageUrl) {
+  const heroSection = $("hero");
+  if (!heroSection) return;
+  if (!heroImageUrl || !heroImageUrl.trim()) return; // nothing to do, CSS default applies
+
+  heroSection.style.backgroundImage =
+    `linear-gradient(160deg, rgba(10,37,64,0.85) 0%, rgba(10,37,64,0.92) 100%), url('${heroImageUrl}')`;
+  heroSection.style.backgroundSize     = "cover";
+  heroSection.style.backgroundPosition = "center";
 }
 
 // ── 1. Settings ──────────────────────────────────────────────
@@ -127,25 +142,29 @@ async function loadSettings() {
     console.warn("[Settings] Firebase unavailable, using fallback.", e.message);
   }
 
+  // Hero image — apply first so it loads as early as possible
+  applyHeroImage(s.heroImage || "");
+
   const tagline = s.tagline?.trim() || "Trusted Grocery Store Since 1995";
-  setText("hero-tagline",      tagline);
-  setText("about-text",        s.aboutText);
-  setText("store-address",     s.address);
-  setText("location-address",  s.address);
-  setText("location-landmark", "📍 Landmark: Kumlai Bridge");
-  setText("footer-phone",      `+91 ${s.phone}`);
+  setText("hero-tagline",     tagline);
+  setText("about-text",       s.aboutText);
+  setText("store-address",    s.address);
+  setText("location-address", s.address);
+  setText("footer-phone",     `+91 ${s.phone || "6296622391"}`);
 
   const timing = `${s.openTime} – ${s.closeTime}`;
   setText("store-timing",    timing);
   setText("location-timing", timing);
 
   const phone = s.phone || "6296622391";
+  setHref(
+    ["call-btn", "nav-call-btn", "mobile-call-btn", "about-call-btn", "footer-call-btn"],
+    `tel:${phone}`
+  );
+
   const waNum = s.whatsapp || "6296622391";
   const waMsg = encodeURIComponent("Hi, I want to check product availability");
-  const waUrl = `https://wa.me/91${waNum}?text=${waMsg}`;
-
-  setHref(["call-btn", "nav-call-btn", "mobile-call-btn", "about-call-btn", "footer-call-btn"], `tel:${phone}`);
-  setHref(["whatsapp-float", "footer-wa-btn"], waUrl);
+  setHref(["whatsapp-float", "footer-wa-btn"], `https://wa.me/91${waNum}?text=${waMsg}`);
 
   const mapBtn = $("map-link-btn");
   if (mapBtn) mapBtn.href = s.mapLink || FALLBACK.settings.mapLink;
@@ -293,11 +312,7 @@ async function loadReviews() {
 
   reviews.forEach((r, i) => {
     const initials = (r.name || "?")
-      .split(" ")
-      .map(w => w[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+      .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
     const div = document.createElement("div");
     div.className = "bg-bglight rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-shadow duration-300";
@@ -330,16 +345,10 @@ function initReviewForm() {
     const text = $("review-text").value.trim();
     const btn  = $("review-submit-btn");
 
-    if (!name || !text) {
-      showMsg("review-msg", "Please fill in both fields.", false);
-      return;
-    }
-    if (text.length < 10) {
-      showMsg("review-msg", "Review must be at least 10 characters.", false);
-      return;
-    }
+    if (!name || !text) { showMsg("review-msg", "Please fill in both fields.", false); return; }
+    if (text.length < 10) { showMsg("review-msg", "Review must be at least 10 characters.", false); return; }
 
-    btn.disabled    = true;
+    btn.disabled = true;
     btn.textContent = "Submitting…";
 
     try {
@@ -351,7 +360,7 @@ function initReviewForm() {
       console.error("[ReviewForm]", err);
       showMsg("review-msg", "Submission failed. Please try again.", false);
     } finally {
-      btn.disabled    = false;
+      btn.disabled = false;
       btn.textContent = "Submit Review";
     }
   });
@@ -366,7 +375,6 @@ function initNav() {
   toggle.addEventListener("click", () => menu.classList.toggle("hidden"));
   menu.querySelectorAll("a").forEach(a => a.addEventListener("click", () => menu.classList.add("hidden")));
 
-  // Sticky style on scroll
   const nav = $("main-nav");
   if (nav) {
     window.addEventListener("scroll", () => {
@@ -388,12 +396,9 @@ function registerSW() {
 async function init() {
   registerSW();
   initNav();
-
   await loadSettings();
   await Promise.all([loadCategories(), loadProducts(), loadGallery(), loadReviews()]);
-
   initReviewForm();
-
   if (window.AOS) {
     window.AOS.init({ duration: 650, once: true, offset: 70, easing: "ease-out-cubic" });
   }
