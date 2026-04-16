@@ -1,5 +1,5 @@
 // ============================================================
-// main.js — Public website logic for index.html
+// main.js — Public website logic
 // ============================================================
 
 import { db } from "./firebase.js";
@@ -8,42 +8,20 @@ import {
   doc, getDoc, query, orderBy, where, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ── DOM helper ───────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 
-// ── Fallback data (used when Firebase fails) ─────────────────
-const FALLBACK = {
-  settings: {
-    tagline:   "Trusted Grocery Store Since 1995",
-    aboutText: "Sen Grocery Store has been proudly serving the community of Baradighi, Mal, Jalpaiguri since 1995. Founded with a vision to bring the freshest groceries and daily essentials to every household, we have grown from a small corner shop into the most trusted grocery destination in the region. For nearly three decades, our commitment to quality, affordability, and genuine customer care has never wavered. Whether it's fresh produce, packaged goods, spices, or personal care — our shelves are always stocked with everything your family needs at the best prices in town.",
-    phone:     "6296622391",
-    whatsapp:  "6296622391",
-    address:   "Sen Grocery Store, Kumlai Bridge, Demkajhora, Baradighi, Mal, Jalpaiguri, 735230",
-    openTime:  "7:00 AM",
-    closeTime: "8:00 PM",
-    mapLink:   "https://maps.app.goo.gl/dLS8GtLeGqyk9wKE8",
-    heroImage: "",
-  },
-  categories: [
-    { id: "c1", name: "Dairy",         imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&q=75", order: 1 },
-    { id: "c2", name: "Snacks",        imageUrl: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&q=75", order: 2 },
-    { id: "c3", name: "Beverages",     imageUrl: "https://images.unsplash.com/photo-1625772452859-1c03d5bf1137?w=400&q=75", order: 3 },
-    { id: "c4", name: "Grains",        imageUrl: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=75", order: 4 },
-    { id: "c5", name: "Spices",        imageUrl: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=75", order: 5 },
-    { id: "c6", name: "Personal Care", imageUrl: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=75", order: 6 },
-  ],
-  products: [
-    { id: "p1", name: "Milk",        imageUrl: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=75",  isFeatured: true },
-    { id: "p2", name: "Biscuits",    imageUrl: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=75",  isFeatured: true },
-    { id: "p3", name: "Rice",        imageUrl: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&q=75", isFeatured: true },
-    { id: "p4", name: "Cooking Oil", imageUrl: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=75", isFeatured: true },
-    { id: "p5", name: "Soft Drinks", imageUrl: "https://images.unsplash.com/photo-1625772452859-1c03d5bf1137?w=400&q=75", isFeatured: true },
-  ],
-  reviews: [
-    { id: "r1", name: "Rahul Sharma", text: "Best grocery store in the area! Always fresh stock and unbeatable prices. Highly recommended to everyone." },
-    { id: "r2", name: "Priya Das",    text: "Shopping here since childhood. Quality never drops and the owner is always helpful and friendly." },
-    { id: "r3", name: "Amit Kumar",   text: "Very reliable store. You can find absolutely everything you need here without going anywhere else." },
-  ],
+// ── Settings fallback (real shop data — kept intentionally) ──
+// Categories, products, reviews have NO fallback per spec.
+const SETTINGS_FALLBACK = {
+  tagline:   "Trusted Grocery Store Since 1995",
+  aboutText: "Sen Grocery Store has been proudly serving the community of Baradighi, Mal, Jalpaiguri since 1995. Founded with a vision to bring the freshest groceries and daily essentials to every household, we have grown from a small corner shop into the most trusted grocery destination in the region. For nearly three decades, our commitment to quality, affordability, and genuine customer care has never wavered.",
+  phone:     "6296622391",
+  whatsapp:  "6296622391",
+  address:   "Sen Grocery Store, Kumlai Bridge, Demkajhora, Baradighi, Mal, Jalpaiguri, 735230",
+  openTime:  "7:00 AM",
+  closeTime: "8:00 PM",
+  mapLink:   "https://maps.app.goo.gl/dLS8GtLeGqyk9wKE8",
+  heroImage: "",
 };
 
 // ── Utilities ────────────────────────────────────────────────
@@ -80,7 +58,8 @@ function showMsg(elId, text, ok) {
   setTimeout(() => { e.textContent = ""; }, 5000);
 }
 
-function spinner() {
+// Spinner HTML for loading grids
+function spinnerHTML() {
   return `<div class="col-span-full flex justify-center items-center py-12 gap-2 text-gray-400">
     <svg class="animate-spin h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -90,7 +69,17 @@ function spinner() {
   </div>`;
 }
 
-// ── Open/closed indicator ─────────────────────────────────────
+// Empty state HTML — used when Firestore collection is empty
+function emptyHTML(message) {
+  return `<div class="col-span-full flex flex-col items-center justify-center py-14 gap-3 text-gray-400">
+    <svg class="h-12 w-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+    </svg>
+    <p class="text-sm font-medium">${message}</p>
+  </div>`;
+}
+
+// ── Store open/closed indicator ───────────────────────────────
 function parseTime(t) {
   const m = (t || "").match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return null;
@@ -117,15 +106,10 @@ function updateOpenIndicator(openTime, closeTime) {
        <span class="text-red-500 text-sm font-semibold">Currently Closed</span>`;
 }
 
-// ── NEW: Apply hero background from Firestore ─────────────────
-// If admin has uploaded a heroImage, apply it as the background.
-// The same gradient overlay is preserved so text stays readable.
-// If heroImage is empty/absent, the CSS .hero-bg class default image is used.
+// ── Apply hero background image from Firestore ────────────────
 function applyHeroImage(heroImageUrl) {
   const heroSection = $("hero");
-  if (!heroSection) return;
-  if (!heroImageUrl || !heroImageUrl.trim()) return; // nothing to do, CSS default applies
-
+  if (!heroSection || !heroImageUrl?.trim()) return;
   heroSection.style.backgroundImage =
     `linear-gradient(160deg, rgba(10,37,64,0.85) 0%, rgba(10,37,64,0.92) 100%), url('${heroImageUrl}')`;
   heroSection.style.backgroundSize     = "cover";
@@ -134,15 +118,14 @@ function applyHeroImage(heroImageUrl) {
 
 // ── 1. Settings ──────────────────────────────────────────────
 async function loadSettings() {
-  let s = FALLBACK.settings;
+  let s = { ...SETTINGS_FALLBACK };
   try {
     const snap = await getDoc(doc(db, "settings", "main"));
-    if (snap.exists()) s = { ...FALLBACK.settings, ...snap.data() };
+    if (snap.exists()) s = { ...SETTINGS_FALLBACK, ...snap.data() };
   } catch (e) {
     console.warn("[Settings] Firebase unavailable, using fallback.", e.message);
   }
 
-  // Hero image — apply first so it loads as early as possible
   applyHeroImage(s.heroImage || "");
 
   const tagline = s.tagline?.trim() || "Trusted Grocery Store Since 1995";
@@ -167,28 +150,33 @@ async function loadSettings() {
   setHref(["whatsapp-float", "footer-wa-btn"], `https://wa.me/91${waNum}?text=${waMsg}`);
 
   const mapBtn = $("map-link-btn");
-  if (mapBtn) mapBtn.href = s.mapLink || FALLBACK.settings.mapLink;
+  if (mapBtn) mapBtn.href = s.mapLink || SETTINGS_FALLBACK.mapLink;
 
   updateOpenIndicator(s.openTime, s.closeTime);
 }
 
-// ── 2. Categories ────────────────────────────────────────────
+// ── 2. Categories — NO hardcoded fallback ────────────────────
 async function loadCategories() {
   const grid = $("categories-grid");
   if (!grid) return;
-  grid.innerHTML = spinner();
+  grid.innerHTML = spinnerHTML();
 
   let cats = [];
   try {
     const q    = query(collection(db, "categories"), orderBy("order", "asc"));
     const snap = await getDocs(q);
     snap.forEach(d => cats.push({ id: d.id, ...d.data() }));
-    if (!cats.length) throw new Error("empty");
-  } catch {
-    cats = FALLBACK.categories;
+  } catch (err) {
+    console.error("[Categories] Load failed:", err);
   }
 
   grid.innerHTML = "";
+
+  if (!cats.length) {
+    grid.innerHTML = emptyHTML("No categories available yet.");
+    return;
+  }
+
   cats.forEach((cat, i) => {
     const ph = `https://placehold.co/400x400/0A2540/2EC4B6?text=${encodeURIComponent(cat.name)}`;
     const div = document.createElement("div");
@@ -209,26 +197,32 @@ async function loadCategories() {
       </div>`;
     grid.appendChild(div);
   });
+
   if (window.AOS) window.AOS.refresh();
 }
 
-// ── 3. Featured Products ─────────────────────────────────────
+// ── 3. Featured Products — NO hardcoded fallback ─────────────
 async function loadProducts() {
   const grid = $("products-grid");
   if (!grid) return;
-  grid.innerHTML = spinner();
+  grid.innerHTML = spinnerHTML();
 
   let prods = [];
   try {
     const q    = query(collection(db, "products"), where("isFeatured", "==", true));
     const snap = await getDocs(q);
     snap.forEach(d => prods.push({ id: d.id, ...d.data() }));
-    if (!prods.length) throw new Error("empty");
-  } catch {
-    prods = FALLBACK.products.filter(p => p.isFeatured);
+  } catch (err) {
+    console.error("[Products] Load failed:", err);
   }
 
   grid.innerHTML = "";
+
+  if (!prods.length) {
+    grid.innerHTML = emptyHTML("No featured products available yet.");
+    return;
+  }
+
   prods.forEach((p, i) => {
     const ph = `https://placehold.co/400x400/F8F9FA/0A2540?text=${encodeURIComponent(p.name)}`;
     const div = document.createElement("div");
@@ -251,6 +245,7 @@ async function loadProducts() {
       </div>`;
     grid.appendChild(div);
   });
+
   if (window.AOS) window.AOS.refresh();
 }
 
@@ -289,7 +284,7 @@ async function loadGallery() {
   });
 }
 
-// ── 5. Reviews ───────────────────────────────────────────────
+// ── 5. Reviews — NO hardcoded fallback ───────────────────────
 async function loadReviews() {
   const grid = $("reviews-grid");
   if (!grid) return;
@@ -299,14 +294,14 @@ async function loadReviews() {
     const q    = query(collection(db, "reviews"), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     snap.forEach(d => reviews.push({ id: d.id, ...d.data() }));
-    if (!reviews.length) throw new Error("empty");
-  } catch {
-    reviews = FALLBACK.reviews;
+  } catch (err) {
+    console.error("[Reviews] Load failed:", err);
   }
 
   grid.innerHTML = "";
+
   if (!reviews.length) {
-    grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-6">No reviews yet — be the first!</p>`;
+    grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-8">No reviews yet — be the first to share your experience!</p>`;
     return;
   }
 
@@ -331,10 +326,11 @@ async function loadReviews() {
       <p class="text-gray-600 text-sm leading-relaxed italic">"${esc(r.text)}"</p>`;
     grid.appendChild(div);
   });
+
   if (window.AOS) window.AOS.refresh();
 }
 
-// ── 6. Review Submission ─────────────────────────────────────
+// ── 6. Review Submission Form ─────────────────────────────────
 function initReviewForm() {
   const form = $("review-form");
   if (!form) return;
@@ -345,14 +341,24 @@ function initReviewForm() {
     const text = $("review-text").value.trim();
     const btn  = $("review-submit-btn");
 
-    if (!name || !text) { showMsg("review-msg", "Please fill in both fields.", false); return; }
-    if (text.length < 10) { showMsg("review-msg", "Review must be at least 10 characters.", false); return; }
+    if (!name || !text) {
+      showMsg("review-msg", "Please fill in both fields.", false);
+      return;
+    }
+    if (text.length < 10) {
+      showMsg("review-msg", "Review must be at least 10 characters.", false);
+      return;
+    }
 
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = "Submitting…";
 
     try {
-      await addDoc(collection(db, "reviews"), { name, text, createdAt: serverTimestamp() });
+      await addDoc(collection(db, "reviews"), {
+        name,
+        text,
+        createdAt: serverTimestamp(),
+      });
       showMsg("review-msg", "✓ Thank you! Your review has been submitted.", true);
       form.reset();
       await loadReviews();
@@ -360,7 +366,7 @@ function initReviewForm() {
       console.error("[ReviewForm]", err);
       showMsg("review-msg", "Submission failed. Please try again.", false);
     } finally {
-      btn.disabled = false;
+      btn.disabled    = false;
       btn.textContent = "Submit Review";
     }
   });
@@ -396,9 +402,12 @@ function registerSW() {
 async function init() {
   registerSW();
   initNav();
+
   await loadSettings();
   await Promise.all([loadCategories(), loadProducts(), loadGallery(), loadReviews()]);
+
   initReviewForm();
+
   if (window.AOS) {
     window.AOS.init({ duration: 650, once: true, offset: 70, easing: "ease-out-cubic" });
   }
