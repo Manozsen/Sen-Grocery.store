@@ -1,7 +1,7 @@
 // ============================================================
-// admin.js — Admin panel logic for admin.html
-// Only gwmanoj22@gmail.com has access
-// Images → Cloudinary unsigned upload (no Firebase Storage)
+// admin.js — Admin panel logic
+// Auth: Firebase Auth + Firestore role check (users/{uid}.role === "admin")
+// Images: Cloudinary unsigned upload
 // ============================================================
 
 import { db, auth } from "./firebase.js";
@@ -13,22 +13,102 @@ import {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// ── Cloudinary config ────────────────────────────────────────
+// ── Cloudinary ────────────────────────────────────────────────
 const CLOUDINARY_CLOUD  = "dthxk16eq";
 const CLOUDINARY_PRESET = "unsigned_upload";
 const CLOUDINARY_URL    = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`;
 
-// ── Constants ────────────────────────────────────────────────
-const ADMIN_EMAIL = "gwmanoj22@gmail.com";
-
-// ── DOM helper ───────────────────────────────────────────────
+// ── DOM helper ────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 
-// ── Local state ──────────────────────────────────────────────
+// ── Local state ───────────────────────────────────────────────
 let categories  = [];
 let products    = [];
 let storeImages = [];
 let reviews     = [];
+
+// ============================================================
+// TOAST NOTIFICATION SYSTEM
+// Replaces all alert() / showMsg() calls
+// ============================================================
+function showToast(type, message) {
+  const container = $("toast-container");
+  if (!container) return;
+
+  const isSuccess = type === "success";
+  const toast = document.createElement("div");
+
+  toast.className = [
+    "flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg",
+    "text-sm font-medium text-white font-poppins max-w-sm",
+    "transform transition-all duration-300",
+    "translate-x-0 opacity-0",          // start hidden
+    isSuccess ? "bg-green-500" : "bg-red-500",
+  ].join(" ");
+
+  toast.innerHTML = `
+    <span class="flex-shrink-0 text-base">${isSuccess ? "✓" : "✗"}</span>
+    <span class="flex-1 leading-snug">${esc(message)}</span>
+    <button onclick="this.parentElement.remove()"
+            class="flex-shrink-0 text-white/70 hover:text-white ml-1 text-lg leading-none">×</button>
+  `;
+
+  container.appendChild(toast);
+
+  // Animate in (next tick)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      toast.classList.remove("opacity-0");
+      toast.classList.add("opacity-100");
+    });
+  });
+
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    toast.classList.add("opacity-0", "translate-x-full");
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ============================================================
+// DELETE CONFIRMATION MODAL
+// Returns a Promise<boolean> — true if admin confirmed delete
+// ============================================================
+function confirmDelete(itemLabel = "this item") {
+  return new Promise((resolve) => {
+    const modal      = $("delete-modal");
+    const msgEl      = $("delete-modal-msg");
+    const confirmBtn = $("delete-confirm-btn");
+    const cancelBtn  = $("delete-cancel-btn");
+
+    if (!modal) { resolve(false); return; }
+
+    // Set message
+    if (msgEl) {
+      msgEl.textContent = `Are you sure you want to delete ${itemLabel}? This action cannot be undone.`;
+    }
+
+    modal.classList.remove("hidden");
+
+    // One-shot event listeners — cleaned up after use
+    function onConfirm() {
+      cleanup();
+      resolve(true);
+    }
+    function onCancel() {
+      cleanup();
+      resolve(false);
+    }
+    function cleanup() {
+      modal.classList.add("hidden");
+      confirmBtn.removeEventListener("click", onConfirm);
+      cancelBtn.removeEventListener("click",  onCancel);
+    }
+
+    confirmBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click",  onCancel);
+  });
+}
 
 // ============================================================
 // UTILITIES
@@ -44,31 +124,20 @@ function escAttr(str) {
   return (str || "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-function showMsg(elId, text, ok) {
-  const e = $(elId);
-  if (!e) return;
-  e.textContent = text;
-  e.className   = ok
-    ? "mt-2 text-sm font-semibold text-green-600"
-    : "mt-2 text-sm font-semibold text-red-500";
-  setTimeout(() => { e.textContent = ""; }, 5000);
-}
-
 function setLoading(id, msg = "Loading…") {
   const e = $(id);
   if (e) e.innerHTML = `<p class="text-gray-400 text-sm italic">${msg}</p>`;
 }
 
-// ── Progress bar ─────────────────────────────────────────────
 function setProgress(barId, wrapId, pct) {
   const bar  = $(barId);
   const wrap = $(wrapId);
-  if (bar)  bar.style.width  = `${pct}%`;
+  if (bar)  bar.style.width = `${pct}%`;
   if (wrap) wrap.classList.toggle("hidden", pct === 0 || pct === 100);
 }
 
 // ============================================================
-// CLOUDINARY UPLOAD — core XHR upload with progress
+// CLOUDINARY UPLOAD
 // ============================================================
 async function uploadToCloudinary(file, barId, wrapId) {
   return new Promise((resolve, reject) => {
@@ -91,7 +160,7 @@ async function uploadToCloudinary(file, barId, wrapId) {
       if (xhr.status === 200) {
         resolve(JSON.parse(xhr.responseText).secure_url);
       } else {
-        reject(new Error(`Cloudinary error (${xhr.status}): ${xhr.statusText}`));
+        reject(new Error(`Cloudinary error (${xhr.status})`));
       }
     };
     xhr.onerror = () => reject(new Error("Network error during upload."));
@@ -100,48 +169,85 @@ async function uploadToCloudinary(file, barId, wrapId) {
 }
 
 // ============================================================
-// AUTH
+// AUTH — Firestore role-based access
+// users/{uid}.role must equal "admin"
 // ============================================================
 function initAuth() {
-  onAuthStateChanged(auth, (user) => {
-    if (user && user.email === ADMIN_EMAIL) {
-      $("login-screen").classList.add("hidden");
-      $("admin-panel").classList.remove("hidden");
-      $("admin-user-email").textContent = user.email;
-      loadAllData();
-    } else {
-      if (user) signOut(auth); // wrong account — boot out
-      $("login-screen").classList.remove("hidden");
-      $("admin-panel").classList.add("hidden");
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      showLoginScreen();
+      return;
+    }
+
+    // ── Role check via Firestore ─────────────────────────────
+    try {
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+
+      if (userSnap.exists() && userSnap.data().role === "admin") {
+        // ✅ Verified admin
+        showAdminPanel(user.email);
+        loadAllData();
+      } else {
+        // ❌ Authenticated but not admin
+        await signOut(auth);
+        showLoginScreen();
+        setLoginError("Access denied. Your account does not have admin privileges.");
+      }
+    } catch (err) {
+      console.error("[Auth] Role check failed:", err);
+      await signOut(auth);
+      showLoginScreen();
+      setLoginError("Authentication error. Please try again.");
     }
   });
 
+  // ── Login form ───────────────────────────────────────────
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = $("login-email").value.trim();
     const pass  = $("login-pass").value;
     const btn   = $("login-btn");
-    const errEl = $("login-error");
 
-    if (email !== ADMIN_EMAIL) {
-      errEl.textContent = "Access denied. Unauthorised email.";
-      return;
-    }
-
-    errEl.textContent = "";
-    btn.disabled      = true;
-    btn.textContent   = "Signing in…";
+    clearLoginError();
+    btn.disabled    = true;
+    btn.textContent = "Signing in…";
 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
+      // onAuthStateChanged handles the rest
     } catch {
-      errEl.textContent = "Incorrect password. Please try again.";
-      btn.disabled      = false;
-      btn.textContent   = "Sign In";
+      setLoginError("Incorrect email or password. Please try again.");
+      btn.disabled    = false;
+      btn.textContent = "Sign In";
     }
   });
 
-  $("logout-btn").addEventListener("click", () => signOut(auth));
+  // ── Logout ───────────────────────────────────────────────
+  $("logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    showLoginScreen();
+  });
+}
+
+function showLoginScreen() {
+  $("login-screen").classList.remove("hidden");
+  $("admin-panel").classList.add("hidden");
+}
+
+function showAdminPanel(email) {
+  $("login-screen").classList.add("hidden");
+  $("admin-panel").classList.remove("hidden");
+  $("admin-user-email").textContent = email || "";
+}
+
+function setLoginError(msg) {
+  const e = $("login-error");
+  if (e) e.textContent = msg;
+}
+
+function clearLoginError() {
+  const e = $("login-error");
+  if (e) e.textContent = "";
 }
 
 // ============================================================
@@ -168,7 +274,7 @@ function initTabs() {
 }
 
 // ============================================================
-// LOAD ALL
+// LOAD ALL DATA
 // ============================================================
 function loadAllData() {
   loadSettings();
@@ -179,7 +285,7 @@ function loadAllData() {
 }
 
 // ============================================================
-// SETTINGS  (+ hero image upload)
+// SETTINGS
 // ============================================================
 async function loadSettings() {
   try {
@@ -195,17 +301,14 @@ async function loadSettings() {
       $("set-closetime").value = s.closeTime || "";
       $("set-maplink").value   = s.mapLink   || "";
 
-      // Show current hero image preview if one exists
-      if (s.heroImage) {
-        updateHeroPreview(s.heroImage);
-      }
+      if (s.heroImage) updateHeroPreview(s.heroImage);
     }
   } catch (err) {
     console.error("[Settings] Load failed:", err);
+    showToast("error", "Failed to load settings.");
   }
 }
 
-// Update the hero preview thumbnail in the settings tab
 function updateHeroPreview(url) {
   const preview = $("hero-img-preview");
   const wrap    = $("hero-preview-wrap");
@@ -214,28 +317,22 @@ function updateHeroPreview(url) {
   wrap.classList.remove("hidden");
 }
 
-// Upload hero image → Cloudinary → save to Firestore settings/main.heroImage
 window.uploadHeroImage = async function () {
   const file = $("hero-img-file")?.files[0];
   const btn  = $("upload-hero-btn");
-  const msg  = $("hero-img-msg");
-
-  if (!file) { alert("Please select an image file."); return; }
+  if (!file) { showToast("error", "Please select an image file."); return; }
 
   btn.disabled    = true;
   btn.textContent = "Uploading…";
 
   try {
     const url = await uploadToCloudinary(file, "hero-prog-bar", "hero-prog-wrap");
-
-    // Merge heroImage into existing settings document (setDoc with merge)
     await setDoc(doc(db, "settings", "main"), { heroImage: url }, { merge: true });
-
     $("hero-img-file").value = "";
     updateHeroPreview(url);
-    showMsg("hero-img-msg", "✓ Hero image updated!", true);
+    showToast("success", "Hero image updated successfully!");
   } catch (err) {
-    showMsg("hero-img-msg", "✗ Upload failed: " + err.message, false);
+    showToast("error", "Upload failed: " + err.message);
   } finally {
     btn.disabled    = false;
     btn.textContent = "Upload Hero Image";
@@ -249,7 +346,6 @@ window.saveSettings = async function () {
   btn.textContent = "Saving…";
 
   try {
-    // Use merge:true so heroImage (and any future fields) are never accidentally deleted
     await setDoc(doc(db, "settings", "main"), {
       tagline:   $("set-tagline").value.trim(),
       aboutText: $("set-about").value.trim(),
@@ -260,9 +356,9 @@ window.saveSettings = async function () {
       closeTime: $("set-closetime").value.trim(),
       mapLink:   $("set-maplink").value.trim(),
     }, { merge: true });
-    showMsg("settings-msg", "✓ Settings saved!", true);
+    showToast("success", "Settings saved successfully!");
   } catch (err) {
-    showMsg("settings-msg", "✗ Save failed: " + err.message, false);
+    showToast("error", "Save failed: " + err.message);
   } finally {
     btn.disabled    = false;
     btn.textContent = "Save Settings";
@@ -270,7 +366,7 @@ window.saveSettings = async function () {
 };
 
 // ============================================================
-// CATEGORIES — CRUD + inline image replace
+// CATEGORIES — Full CRUD + inline image replace
 // ============================================================
 async function loadCategories() {
   setLoading("categories-list");
@@ -281,6 +377,7 @@ async function loadCategories() {
     snap.forEach(d => categories.push({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error("[Categories] Load failed:", err);
+    showToast("error", "Failed to load categories.");
   }
   renderCategoriesList();
 }
@@ -290,18 +387,24 @@ function renderCategoriesList() {
   if (!list) return;
 
   if (!categories.length) {
-    list.innerHTML = `<p class="text-gray-400 text-sm italic">No categories yet. Add one below.</p>`;
+    list.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+        <p class="text-sm font-medium">No categories yet. Add your first category above.</p>
+      </div>`;
     return;
   }
 
   list.innerHTML = "";
   categories.forEach(cat => {
-    const ph  = `https://placehold.co/56x56/e5e7eb/6b7280?text=${encodeURIComponent(cat.name.slice(0, 1))}`;
+    const ph  = `https://placehold.co/56x56/e5e7eb/6b7280?text=${encodeURIComponent((cat.name || "?").slice(0, 1))}`;
     const div = document.createElement("div");
     div.id        = `cat-row-${cat.id}`;
     div.className = "flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-accent/40 transition-colors";
     div.innerHTML = `
-      <!-- Current image thumbnail -->
+      <!-- Thumbnail with hover-to-change -->
       <div class="relative flex-shrink-0 group/thumb w-14 h-14">
         <img
           id="cat-thumb-${cat.id}"
@@ -310,47 +413,37 @@ function renderCategoriesList() {
           class="w-14 h-14 rounded-lg object-cover bg-gray-100 block"
           alt="${escAttr(cat.name)}"
         />
-        <!-- Hover overlay: click to change image -->
-        <label
-          for="cat-inline-file-${cat.id}"
-          title="Click to change image"
-          class="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer"
-        >
+        <label for="cat-inline-file-${cat.id}" title="Click to change image"
+               class="absolute inset-0 bg-black/55 rounded-lg flex items-center justify-center
+                      opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer">
           <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
           </svg>
         </label>
-        <!-- Hidden file input — triggers on label click -->
-        <input
-          type="file"
-          id="cat-inline-file-${cat.id}"
-          accept="image/*"
-          class="hidden"
-          onchange="replaceCategoryImage('${cat.id}', this)"
-        />
+        <input type="file" id="cat-inline-file-${cat.id}" accept="image/*" class="hidden"
+               onchange="replaceCategoryImage('${cat.id}', this)" />
       </div>
 
-      <!-- Name + order -->
+      <!-- Info -->
       <div class="flex-1 min-w-0">
         <p class="font-semibold text-gray-800 font-poppins truncate">${esc(cat.name)}</p>
         <p class="text-xs text-gray-400">Order: ${cat.order ?? 0}</p>
-        <!-- Per-row upload status -->
         <p id="cat-img-status-${cat.id}" class="text-xs font-medium mt-0.5 hidden"></p>
       </div>
 
-      <!-- Action buttons -->
+      <!-- Actions -->
       <div class="flex gap-2 flex-shrink-0">
-        <button onclick="editCategory('${cat.id}')"
+        <button onclick="openCatModal('${cat.id}')"
                 class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
-        <button onclick="deleteCategory('${cat.id}')"
+        <button onclick="deleteCategoryConfirm('${cat.id}', '${escAttr(cat.name)}')"
                 class="btn-admin-sm border-red-300 text-red-500 hover:bg-red-50">Delete</button>
       </div>`;
     list.appendChild(div);
   });
 }
 
-// Called when admin selects a new file directly on the category row thumbnail
+// Inline image replace (hover on thumbnail)
 window.replaceCategoryImage = async function (catId, inputEl) {
   const file = inputEl?.files?.[0];
   if (!file) return;
@@ -358,35 +451,48 @@ window.replaceCategoryImage = async function (catId, inputEl) {
   const thumb  = $(`cat-thumb-${catId}`);
   const status = $(`cat-img-status-${catId}`);
 
-  // Show uploading state
-  if (thumb)  { thumb.style.opacity = "0.4"; }
-  if (status) { status.textContent = "Uploading…"; status.className = "text-xs font-medium mt-0.5 text-accent"; status.classList.remove("hidden"); }
+  if (thumb)  thumb.style.opacity = "0.4";
+  if (status) {
+    status.textContent = "Uploading…";
+    status.className   = "text-xs font-medium mt-0.5 text-accent";
+    status.classList.remove("hidden");
+  }
 
   try {
     const url = await uploadToCloudinary(file, null, null);
-
-    // Update Firestore using doc.id
     await updateDoc(doc(db, "categories", catId), { imageUrl: url });
 
-    // Update thumbnail instantly — no full re-render needed
     if (thumb)  { thumb.src = url; thumb.style.opacity = "1"; }
-    if (status) { status.textContent = "✓ Image updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
-    setTimeout(() => { if (status) status.classList.add("hidden"); }, 3000);
+    if (status) { status.textContent = "✓ Updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
+    setTimeout(() => status?.classList.add("hidden"), 3000);
 
-    // Sync local state so Edit modal shows fresh URL
     const cat = categories.find(c => c.id === catId);
     if (cat) cat.imageUrl = url;
 
+    showToast("success", "Category image updated!");
   } catch (err) {
-    if (thumb)  { thumb.style.opacity = "1"; }
-    if (status) { status.textContent = "✗ Upload failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
-    console.error("[CatImageReplace]", err);
+    if (thumb)  thumb.style.opacity = "1";
+    if (status) { status.textContent = "✗ Failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
+    showToast("error", "Image upload failed: " + err.message);
   } finally {
-    inputEl.value = ""; // reset so same file can be re-selected if needed
+    inputEl.value = "";
   }
 };
 
-// ── Category modal (Add / Edit) ──────────────────────────────
+// Delete with confirmation modal
+window.deleteCategoryConfirm = async function (id, name) {
+  const confirmed = await confirmDelete(`the category "${name}"`);
+  if (!confirmed) return;
+  try {
+    await deleteDoc(doc(db, "categories", id));
+    showToast("success", `Category "${name}" deleted.`);
+    await loadCategories();
+  } catch (err) {
+    showToast("error", "Delete failed: " + err.message);
+  }
+};
+
+// Modal open/close
 window.openCatModal = function (id = "") {
   const cat = id ? categories.find(c => c.id === id) : null;
   $("cat-modal-title").textContent = cat ? "Edit Category" : "Add Category";
@@ -398,8 +504,7 @@ window.openCatModal = function (id = "") {
   $("cat-modal").classList.remove("hidden");
 };
 
-window.editCategory  = (id) => window.openCatModal(id);
-window.closeCatModal = ()   => $("cat-modal").classList.add("hidden");
+window.closeCatModal = () => $("cat-modal").classList.add("hidden");
 
 window.saveCategoryForm = async function () {
   const id    = $("cat-edit-id").value;
@@ -409,27 +514,27 @@ window.saveCategoryForm = async function () {
   const file  = $("cat-image-file").files[0];
   const btn   = $("save-cat-btn");
 
-  if (!name) { alert("Category name is required."); return; }
+  if (!name) { showToast("error", "Category name is required."); return; }
 
   btn.disabled    = true;
   btn.textContent = "Saving…";
 
   try {
-    if (file) {
-      url = await uploadToCloudinary(file, "cat-prog-bar", "cat-prog-wrap");
-    }
+    if (file) url = await uploadToCloudinary(file, "cat-prog-bar", "cat-prog-wrap");
 
     const data = { name, imageUrl: url || "", order };
     if (id) {
       await updateDoc(doc(db, "categories", id), data);
+      showToast("success", `Category "${name}" updated!`);
     } else {
       await addDoc(collection(db, "categories"), data);
+      showToast("success", `Category "${name}" added!`);
     }
 
     window.closeCatModal();
     await loadCategories();
   } catch (err) {
-    alert("Error: " + err.message);
+    showToast("error", "Error: " + err.message);
   } finally {
     btn.disabled    = false;
     btn.textContent = "Save";
@@ -437,18 +542,8 @@ window.saveCategoryForm = async function () {
   }
 };
 
-window.deleteCategory = async function (id) {
-  if (!confirm("Delete this category? This cannot be undone.")) return;
-  try {
-    await deleteDoc(doc(db, "categories", id));
-    await loadCategories();
-  } catch (err) {
-    alert("Delete failed: " + err.message);
-  }
-};
-
 // ============================================================
-// PRODUCTS — CRUD + inline image replace
+// PRODUCTS — Full CRUD + inline image replace + isFeatured toggle
 // ============================================================
 async function loadProducts() {
   setLoading("products-list");
@@ -458,6 +553,7 @@ async function loadProducts() {
     snap.forEach(d => products.push({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error("[Products] Load failed:", err);
+    showToast("error", "Failed to load products.");
   }
   renderProductsList();
 }
@@ -467,18 +563,24 @@ function renderProductsList() {
   if (!list) return;
 
   if (!products.length) {
-    list.innerHTML = `<p class="text-gray-400 text-sm italic">No products yet. Add one below.</p>`;
+    list.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+        </svg>
+        <p class="text-sm font-medium">No products yet. Add your first product above.</p>
+      </div>`;
     return;
   }
 
   list.innerHTML = "";
   products.forEach(p => {
-    const ph  = `https://placehold.co/56x56/e5e7eb/6b7280?text=${encodeURIComponent(p.name.slice(0, 1))}`;
+    const ph  = `https://placehold.co/56x56/e5e7eb/6b7280?text=${encodeURIComponent((p.name || "?").slice(0, 1))}`;
     const div = document.createElement("div");
     div.id        = `prod-row-${p.id}`;
     div.className = "flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-accent/40 transition-colors";
     div.innerHTML = `
-      <!-- Current image thumbnail with hover-to-change -->
+      <!-- Thumbnail with hover-to-change -->
       <div class="relative flex-shrink-0 group/thumb w-14 h-14">
         <img
           id="prod-thumb-${p.id}"
@@ -487,46 +589,80 @@ function renderProductsList() {
           class="w-14 h-14 rounded-lg object-cover bg-gray-100 block"
           alt="${escAttr(p.name)}"
         />
-        <label
-          for="prod-inline-file-${p.id}"
-          title="Click to change image"
-          class="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer"
-        >
+        <label for="prod-inline-file-${p.id}" title="Click to change image"
+               class="absolute inset-0 bg-black/55 rounded-lg flex items-center justify-center
+                      opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer">
           <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
           </svg>
         </label>
-        <input
-          type="file"
-          id="prod-inline-file-${p.id}"
-          accept="image/*"
-          class="hidden"
-          onchange="replaceProductImage('${p.id}', this)"
-        />
+        <input type="file" id="prod-inline-file-${p.id}" accept="image/*" class="hidden"
+               onchange="replaceProductImage('${p.id}', this)" />
       </div>
 
-      <!-- Name + featured badge -->
+      <!-- Info -->
       <div class="flex-1 min-w-0">
         <p class="font-semibold text-gray-800 font-poppins truncate">${esc(p.name)}</p>
-        <span class="inline-block text-xs px-2 py-0.5 rounded-full mt-0.5 ${p.isFeatured ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"}">
-          ${p.isFeatured ? "⭐ Featured" : "Regular"}
-        </span>
+
+        <!-- isFeatured toggle -->
+        <button
+          id="feat-btn-${p.id}"
+          onclick="toggleFeatured('${p.id}')"
+          class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full mt-1 font-semibold transition-all
+                 ${p.isFeatured
+                   ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}"
+        >
+          <span>${p.isFeatured ? "⭐" : "☆"}</span>
+          <span id="feat-label-${p.id}">${p.isFeatured ? "Featured" : "Regular"}</span>
+        </button>
+
         <p id="prod-img-status-${p.id}" class="text-xs font-medium mt-0.5 hidden"></p>
       </div>
 
-      <!-- Action buttons -->
+      <!-- Actions -->
       <div class="flex gap-2 flex-shrink-0">
-        <button onclick="editProduct('${p.id}')"
+        <button onclick="openProdModal('${p.id}')"
                 class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
-        <button onclick="deleteProduct('${p.id}')"
+        <button onclick="deleteProductConfirm('${p.id}', '${escAttr(p.name)}')"
                 class="btn-admin-sm border-red-300 text-red-500 hover:bg-red-50">Delete</button>
       </div>`;
     list.appendChild(div);
   });
 }
 
-// Called when admin selects a new file directly on the product row thumbnail
+// Toggle isFeatured inline (no modal needed)
+window.toggleFeatured = async function (prodId) {
+  const prod = products.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const newVal = !prod.isFeatured;
+  const btn    = $(`feat-btn-${prodId}`);
+  const label  = $(`feat-label-${prodId}`);
+
+  try {
+    await updateDoc(doc(db, "products", prodId), { isFeatured: newVal });
+    prod.isFeatured = newVal;
+
+    if (btn) {
+      btn.className = btn.className
+        .replace(/bg-\S+|text-\S+-\d+|hover:bg-\S+/g, "")
+        .trim();
+      btn.className += newVal
+        ? " bg-teal-100 text-teal-700 hover:bg-teal-200"
+        : " bg-gray-100 text-gray-500 hover:bg-gray-200";
+      btn.querySelector("span").textContent = newVal ? "⭐" : "☆";
+    }
+    if (label) label.textContent = newVal ? "Featured" : "Regular";
+
+    showToast("success", `"${prod.name}" is now ${newVal ? "featured" : "regular"}.`);
+  } catch (err) {
+    showToast("error", "Toggle failed: " + err.message);
+  }
+};
+
+// Inline image replace
 window.replaceProductImage = async function (prodId, inputEl) {
   const file = inputEl?.files?.[0];
   if (!file) return;
@@ -534,34 +670,46 @@ window.replaceProductImage = async function (prodId, inputEl) {
   const thumb  = $(`prod-thumb-${prodId}`);
   const status = $(`prod-img-status-${prodId}`);
 
-  if (thumb)  { thumb.style.opacity = "0.4"; }
-  if (status) { status.textContent = "Uploading…"; status.className = "text-xs font-medium mt-0.5 text-accent"; status.classList.remove("hidden"); }
+  if (thumb)  thumb.style.opacity = "0.4";
+  if (status) {
+    status.textContent = "Uploading…";
+    status.className   = "text-xs font-medium mt-0.5 text-accent";
+    status.classList.remove("hidden");
+  }
 
   try {
     const url = await uploadToCloudinary(file, null, null);
-
-    // Update Firestore using doc.id
     await updateDoc(doc(db, "products", prodId), { imageUrl: url });
 
-    // Update thumbnail in-place
     if (thumb)  { thumb.src = url; thumb.style.opacity = "1"; }
-    if (status) { status.textContent = "✓ Image updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
-    setTimeout(() => { if (status) status.classList.add("hidden"); }, 3000);
+    if (status) { status.textContent = "✓ Updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
+    setTimeout(() => status?.classList.add("hidden"), 3000);
 
-    // Sync local state
     const prod = products.find(p => p.id === prodId);
     if (prod) prod.imageUrl = url;
 
+    showToast("success", "Product image updated!");
   } catch (err) {
-    if (thumb)  { thumb.style.opacity = "1"; }
-    if (status) { status.textContent = "✗ Upload failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
-    console.error("[ProdImageReplace]", err);
+    if (thumb)  thumb.style.opacity = "1";
+    if (status) { status.textContent = "✗ Failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
+    showToast("error", "Image upload failed: " + err.message);
   } finally {
     inputEl.value = "";
   }
 };
 
-// ── Product modal (Add / Edit) ───────────────────────────────
+window.deleteProductConfirm = async function (id, name) {
+  const confirmed = await confirmDelete(`the product "${name}"`);
+  if (!confirmed) return;
+  try {
+    await deleteDoc(doc(db, "products", id));
+    showToast("success", `Product "${name}" deleted.`);
+    await loadProducts();
+  } catch (err) {
+    showToast("error", "Delete failed: " + err.message);
+  }
+};
+
 window.openProdModal = function (id = "") {
   const p = id ? products.find(x => x.id === id) : null;
   $("prod-modal-title").textContent = p ? "Edit Product" : "Add Product";
@@ -573,8 +721,7 @@ window.openProdModal = function (id = "") {
   $("prod-modal").classList.remove("hidden");
 };
 
-window.editProduct    = (id) => window.openProdModal(id);
-window.closeProdModal = ()   => $("prod-modal").classList.add("hidden");
+window.closeProdModal = () => $("prod-modal").classList.add("hidden");
 
 window.saveProductForm = async function () {
   const id         = $("prod-edit-id").value;
@@ -584,27 +731,27 @@ window.saveProductForm = async function () {
   const file       = $("prod-image-file").files[0];
   const btn        = $("save-prod-btn");
 
-  if (!name) { alert("Product name is required."); return; }
+  if (!name) { showToast("error", "Product name is required."); return; }
 
   btn.disabled    = true;
   btn.textContent = "Saving…";
 
   try {
-    if (file) {
-      url = await uploadToCloudinary(file, "prod-prog-bar", "prod-prog-wrap");
-    }
+    if (file) url = await uploadToCloudinary(file, "prod-prog-bar", "prod-prog-wrap");
 
     const data = { name, imageUrl: url || "", isFeatured };
     if (id) {
       await updateDoc(doc(db, "products", id), data);
+      showToast("success", `Product "${name}" updated!`);
     } else {
       await addDoc(collection(db, "products"), data);
+      showToast("success", `Product "${name}" added!`);
     }
 
     window.closeProdModal();
     await loadProducts();
   } catch (err) {
-    alert("Error: " + err.message);
+    showToast("error", "Error: " + err.message);
   } finally {
     btn.disabled    = false;
     btn.textContent = "Save";
@@ -612,18 +759,8 @@ window.saveProductForm = async function () {
   }
 };
 
-window.deleteProduct = async function (id) {
-  if (!confirm("Delete this product? This cannot be undone.")) return;
-  try {
-    await deleteDoc(doc(db, "products", id));
-    await loadProducts();
-  } catch (err) {
-    alert("Delete failed: " + err.message);
-  }
-};
-
 // ============================================================
-// STORE IMAGES — Upload, URL fallback & Delete
+// STORE IMAGES (Gallery)
 // ============================================================
 async function loadStoreImages() {
   setLoading("store-images-grid", "Loading images…");
@@ -633,6 +770,7 @@ async function loadStoreImages() {
     snap.forEach(d => storeImages.push({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error("[Gallery] Load failed:", err);
+    showToast("error", "Failed to load gallery.");
   }
   renderStoreImages();
 }
@@ -655,7 +793,7 @@ function renderStoreImages() {
            class="w-full h-36 object-cover"
            onerror="this.src='https://placehold.co/300x150/e5e7eb/9ca3af?text=Error'" />
       <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <button onclick="deleteStoreImage('${img.id}')"
+        <button onclick="deleteStoreImageConfirm('${img.id}')"
                 class="bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
           Delete
         </button>
@@ -667,7 +805,7 @@ function renderStoreImages() {
 window.uploadStoreImage = async function () {
   const file = $("store-img-file")?.files[0];
   const btn  = $("upload-gallery-btn");
-  if (!file) { alert("Please select an image."); return; }
+  if (!file) { showToast("error", "Please select an image."); return; }
 
   btn.disabled    = true;
   btn.textContent = "Uploading…";
@@ -676,10 +814,10 @@ window.uploadStoreImage = async function () {
     const url = await uploadToCloudinary(file, "gallery-prog-bar", "gallery-prog-wrap");
     await addDoc(collection(db, "storeImages"), { imageUrl: url, createdAt: serverTimestamp() });
     $("store-img-file").value = "";
-    showMsg("gallery-msg", "✓ Image uploaded!", true);
+    showToast("success", "Gallery image uploaded!");
     await loadStoreImages();
   } catch (err) {
-    showMsg("gallery-msg", "✗ Upload failed: " + err.message, false);
+    showToast("error", "Upload failed: " + err.message);
   } finally {
     btn.disabled    = false;
     btn.textContent = "Upload Image";
@@ -689,24 +827,26 @@ window.uploadStoreImage = async function () {
 
 window.addImageByUrl = async function () {
   const url = $("gallery-url-input")?.value.trim();
-  if (!url) { alert("Please enter a URL."); return; }
+  if (!url) { showToast("error", "Please enter an image URL."); return; }
   try {
     await addDoc(collection(db, "storeImages"), { imageUrl: url, createdAt: serverTimestamp() });
     $("gallery-url-input").value = "";
-    showMsg("gallery-msg", "✓ Image added by URL!", true);
+    showToast("success", "Image added by URL!");
     await loadStoreImages();
   } catch (err) {
-    showMsg("gallery-msg", "✗ Failed: " + err.message, false);
+    showToast("error", "Failed: " + err.message);
   }
 };
 
-window.deleteStoreImage = async function (id) {
-  if (!confirm("Delete this image?")) return;
+window.deleteStoreImageConfirm = async function (id) {
+  const confirmed = await confirmDelete("this gallery image");
+  if (!confirmed) return;
   try {
     await deleteDoc(doc(db, "storeImages", id));
+    showToast("success", "Gallery image deleted.");
     await loadStoreImages();
   } catch (err) {
-    alert("Delete failed: " + err.message);
+    showToast("error", "Delete failed: " + err.message);
   }
 };
 
@@ -722,6 +862,7 @@ async function loadReviews() {
     snap.forEach(d => reviews.push({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error("[Reviews] Load failed:", err);
+    showToast("error", "Failed to load reviews.");
     reviews = [];
   }
   renderReviews();
@@ -732,7 +873,13 @@ function renderReviews() {
   if (!list) return;
 
   if (!reviews.length) {
-    list.innerHTML = `<p class="text-gray-400 text-sm italic">No reviews yet.</p>`;
+    list.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        <p class="text-sm font-medium">No reviews yet.</p>
+      </div>`;
     return;
   }
 
@@ -741,26 +888,42 @@ function renderReviews() {
     const div = document.createElement("div");
     div.id        = `rev-${r.id}`;
     div.className = "p-4 bg-white rounded-xl border border-gray-200";
+
+    // Format timestamp if available
+    let dateStr = "";
+    if (r.createdAt?.toDate) {
+      dateStr = r.createdAt.toDate().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    }
+
     div.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
+
+          <!-- Display mode -->
           <div id="rev-display-${r.id}">
-            <p class="font-semibold text-gray-800 font-poppins text-sm">${esc(r.name)}</p>
-            <p class="text-gray-500 text-sm mt-1 italic leading-relaxed">"${esc(r.text)}"</p>
+            <div class="flex items-center gap-2 mb-1">
+              <p class="font-semibold text-gray-800 font-poppins text-sm">${esc(r.name)}</p>
+              ${dateStr ? `<span class="text-gray-400 text-xs">· ${dateStr}</span>` : ""}
+            </div>
+            <p class="text-gray-500 text-sm italic leading-relaxed">"${esc(r.text)}"</p>
           </div>
-          <div id="rev-edit-${r.id}" class="hidden space-y-2 mt-2">
+
+          <!-- Edit mode (hidden by default) -->
+          <div id="rev-edit-${r.id}" class="hidden space-y-2 mt-1">
             <input type="text" id="rev-name-${r.id}" value="${escAttr(r.name)}"
                    class="admin-input w-full" placeholder="Name" />
             <textarea id="rev-text-${r.id}" rows="3"
                       class="admin-input w-full resize-none" placeholder="Review text">${esc(r.text)}</textarea>
           </div>
         </div>
+
+        <!-- Action buttons -->
         <div class="flex flex-col gap-2 flex-shrink-0">
-          <button id="rev-edit-btn-${r.id}"  onclick="toggleEditReview('${r.id}')"
+          <button id="rev-edit-btn-${r.id}" onclick="toggleEditReview('${r.id}')"
                   class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
-          <button id="rev-save-btn-${r.id}"  onclick="saveReview('${r.id}')"
+          <button id="rev-save-btn-${r.id}" onclick="saveReview('${r.id}')"
                   class="hidden btn-admin-sm border-green-400 text-green-600 hover:bg-green-50">Save</button>
-          <button onclick="deleteReview('${r.id}')"
+          <button onclick="deleteReviewConfirm('${r.id}', '${escAttr(r.name)}')"
                   class="btn-admin-sm border-red-300 text-red-500 hover:bg-red-50">Delete</button>
         </div>
       </div>`;
@@ -776,22 +939,25 @@ window.toggleEditReview = function (id) {
 window.saveReview = async function (id) {
   const name = $(`rev-name-${id}`)?.value.trim();
   const text = $(`rev-text-${id}`)?.value.trim();
-  if (!name || !text) { alert("Name and review text are required."); return; }
+  if (!name || !text) { showToast("error", "Name and review text are required."); return; }
   try {
     await updateDoc(doc(db, "reviews", id), { name, text });
+    showToast("success", "Review updated successfully!");
     await loadReviews();
   } catch (err) {
-    alert("Update failed: " + err.message);
+    showToast("error", "Update failed: " + err.message);
   }
 };
 
-window.deleteReview = async function (id) {
-  if (!confirm("Delete this review permanently?")) return;
+window.deleteReviewConfirm = async function (id, name) {
+  const confirmed = await confirmDelete(`the review by "${name}"`);
+  if (!confirmed) return;
   try {
     await deleteDoc(doc(db, "reviews", id));
+    showToast("success", "Review deleted.");
     await loadReviews();
   } catch (err) {
-    alert("Delete failed: " + err.message);
+    showToast("error", "Delete failed: " + err.message);
   }
 };
 
