@@ -26,7 +26,6 @@
     *, *::before, *::after { box-sizing: border-box; }
     body { font-family: "Inter", sans-serif; background: #F8F9FA; -webkit-font-smoothing: antialiased; }
 
-    /* ── Inputs ── */
     .admin-input {
       display: block; width: 100%;
       padding: 0.65rem 0.875rem;
@@ -37,7 +36,6 @@
     }
     .admin-input:focus { border-color: #2EC4B6; box-shadow: 0 0 0 3px rgba(46,196,182,0.18); }
 
-    /* ── Small action buttons ── */
     .btn-admin-sm {
       display: inline-block;
       padding: 0.3rem 0.75rem;
@@ -46,7 +44,7 @@
       transition: all 0.15s; cursor: pointer; white-space: nowrap;
     }
 
-    /* ── Modal overlay ── */
+    /* Full-screen modals */
     .modal-overlay {
       position: fixed; inset: 0; z-index: 60;
       background: rgba(10,37,64,0.65); backdrop-filter: blur(4px);
@@ -59,8 +57,6 @@
       box-shadow: 0 20px 60px rgba(0,0,0,0.25);
       overflow-y: auto; max-height: 90vh;
     }
-
-    /* ── Delete modal — slightly smaller ── */
     .delete-modal-box {
       background: #fff; border-radius: 16px;
       width: 100%; max-width: 420px;
@@ -68,17 +64,16 @@
       padding: 2rem;
     }
 
-    /* ── Progress bar ── */
+    /* Progress bar */
     .progress-track { height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-top: 0.5rem; }
     .progress-fill  { height: 100%; background: #2EC4B6; border-radius: 3px; width: 0%; transition: width 0.3s; }
 
-    /* ── Active tab ── */
+    /* Active tab */
     [data-tab].border-accent { border-color: #2EC4B6 !important; }
 
-    /* ── Toast container ── */
+    /* Toast */
     #toast-container {
-      position: fixed; top: 1.25rem; right: 1.25rem;
-      z-index: 9999;
+      position: fixed; top: 1.25rem; right: 1.25rem; z-index: 9999;
       display: flex; flex-direction: column; gap: 0.625rem;
       pointer-events: none;
     }
@@ -88,17 +83,12 @@
 
 <body class="bg-bglight min-h-screen font-inter">
 
-  <!-- ════════════════════════════════════════════
-       TOAST CONTAINER — rendered by admin.js
-  ═════════════════════════════════════════════ -->
+  <!-- ── Toast container ─────────────────────────────────── -->
   <div id="toast-container" aria-live="polite"></div>
 
-  <!-- ════════════════════════════════════════════
-       DELETE CONFIRMATION MODAL
-  ═════════════════════════════════════════════ -->
+  <!-- ── Delete confirmation modal ───────────────────────── -->
   <div id="delete-modal" class="modal-overlay hidden">
     <div class="delete-modal-box">
-      <!-- Icon -->
       <div class="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round"
@@ -106,18 +96,14 @@
         </svg>
       </div>
       <h3 class="text-center text-lg font-bold text-gray-800 font-poppins mb-2">Confirm Delete</h3>
-      <p id="delete-modal-msg" class="text-center text-gray-500 text-sm leading-relaxed mb-6">
-        Are you sure you want to delete this item?
-      </p>
+      <p id="delete-modal-msg" class="text-center text-gray-500 text-sm leading-relaxed mb-6">Are you sure?</p>
       <div class="flex gap-3">
         <button id="delete-cancel-btn"
-                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins
-                       py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
           Cancel
         </button>
         <button id="delete-confirm-btn"
-                class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold font-poppins
-                       py-2.5 rounded-xl transition-colors text-sm">
+                class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold font-poppins py-2.5 rounded-xl transition-colors text-sm">
           Delete
         </button>
       </div>
@@ -136,23 +122,19 @@
         <h1 class="text-2xl font-bold text-primary font-poppins">Admin Panel</h1>
         <p class="text-gray-500 text-sm mt-1">Sen Grocery Store — Authorised Access Only</p>
       </div>
-
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-7">
         <form id="login-form" novalidate>
           <div class="mb-4">
             <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Email</label>
-            <input id="login-email" type="email" class="admin-input"
-                   placeholder="admin@example.com" autocomplete="email" required />
+            <input id="login-email" type="email" class="admin-input" placeholder="admin@example.com" autocomplete="email" required />
           </div>
           <div class="mb-5">
             <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Password</label>
-            <input id="login-pass" type="password" class="admin-input"
-                   placeholder="••••••••" autocomplete="current-password" required />
+            <input id="login-pass" type="password" class="admin-input" placeholder="••••••••" autocomplete="current-password" required />
           </div>
           <p id="login-error" class="text-red-500 text-sm font-medium mb-3 min-h-[1.25rem]"></p>
           <button id="login-btn" type="submit"
-                  class="w-full bg-primary text-white font-semibold font-poppins py-3 rounded-xl
-                         hover:bg-primary/90 transition-colors">
+                  class="w-full bg-primary text-white font-semibold font-poppins py-3 rounded-xl hover:bg-primary/90 transition-colors">
             Sign In
           </button>
         </form>
@@ -181,23 +163,23 @@
         <div class="flex items-center gap-4">
           <span id="admin-user-email" class="hidden sm:block text-gray-400 text-xs truncate max-w-[180px]"></span>
           <button id="logout-btn"
-                  class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold
-                         px-4 py-2 rounded-lg transition-colors font-poppins">
+                  class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors font-poppins">
             Sign Out
           </button>
         </div>
       </div>
     </header>
 
-    <!-- Tab navigation -->
+    <!-- Tabs -->
     <div class="bg-white border-b border-gray-200 sticky top-16 z-30 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex gap-0 overflow-x-auto">
-          <button data-tab="settings"   class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⚙️ Settings</button>
-          <button data-tab="categories" class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🏷️ Categories</button>
-          <button data-tab="products"   class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🛒 Products</button>
-          <button data-tab="gallery"    class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🖼️ Gallery</button>
-          <button data-tab="reviews"    class="flex-shrink-0 px-4 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⭐ Reviews</button>
+          <button data-tab="settings"   class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⚙️ Settings</button>
+          <button data-tab="categories" class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🏷️ Categories</button>
+          <button data-tab="products"   class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🛒 Products</button>
+          <button data-tab="offers"     class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🏷️ Offers</button>
+          <button data-tab="gallery"    class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">🖼️ Gallery</button>
+          <button data-tab="reviews"    class="flex-shrink-0 px-3 sm:px-5 py-4 text-xs sm:text-sm font-semibold font-poppins border-b-2 border-transparent text-gray-500 hover:text-accent transition-colors">⭐ Reviews</button>
         </div>
       </div>
     </div>
@@ -209,7 +191,7 @@
       <div data-panel="settings">
         <div class="space-y-6 max-w-2xl">
 
-          <!-- Hero Image Card -->
+          <!-- Hero image -->
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
             <div class="flex items-center gap-2 mb-1">
               <h2 class="text-lg font-bold text-primary font-poppins">Hero Background Image</h2>
@@ -218,22 +200,17 @@
             <p class="text-gray-500 text-sm mb-5">
               Upload a high-quality grocery or store photo. The dark gradient overlay is applied automatically.
             </p>
-
             <div id="hero-preview-wrap" class="hidden mb-5">
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Current Hero Image</p>
               <img id="hero-img-preview" src="" alt="Hero preview"
                    class="w-full max-h-44 object-cover rounded-xl border border-gray-200 shadow-sm" />
             </div>
-
             <div class="flex items-center gap-3 flex-wrap">
               <input id="hero-img-file" type="file" accept="image/*"
-                     class="admin-input flex-1 min-w-0
-                            file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
-                            file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-                            hover:file:bg-accent/20" />
+                     class="admin-input flex-1 min-w-0 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
+                            file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
               <button id="upload-hero-btn" onclick="uploadHeroImage()"
-                      class="flex-shrink-0 bg-primary text-white font-semibold font-poppins
-                             px-5 py-2.5 rounded-xl hover:bg-primary/90 transition-colors text-sm">
+                      class="flex-shrink-0 bg-primary text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-primary/90 transition-colors text-sm">
                 Upload Hero Image
               </button>
             </div>
@@ -243,10 +220,9 @@
             </div>
           </div>
 
-          <!-- Store Settings Card -->
+          <!-- Store settings -->
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
             <h2 class="text-lg font-bold text-primary font-poppins mb-6">Store Settings</h2>
-
             <div class="space-y-5">
               <div>
                 <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Hero Tagline</label>
@@ -286,11 +262,9 @@
                 <input id="set-maplink" type="url" class="admin-input" placeholder="https://maps.app.goo.gl/…" />
               </div>
             </div>
-
-            <div class="mt-6 flex items-center gap-4">
+            <div class="mt-6">
               <button id="save-settings-btn" onclick="saveSettings()"
-                      class="bg-primary text-white font-semibold font-poppins px-6 py-2.5
-                             rounded-xl hover:bg-primary/90 transition-colors text-sm">
+                      class="bg-primary text-white font-semibold font-poppins px-6 py-2.5 rounded-xl hover:bg-primary/90 transition-colors text-sm">
                 Save Settings
               </button>
             </div>
@@ -306,11 +280,8 @@
             <p class="text-gray-500 text-sm mt-0.5">Hover over a thumbnail to change its image inline.</p>
           </div>
           <button onclick="openCatModal()"
-                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl
-                         hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-            </svg>
+                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             Add Category
           </button>
         </div>
@@ -324,18 +295,33 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-xl font-bold text-primary font-poppins">Products</h2>
-            <p class="text-gray-500 text-sm mt-0.5">Hover over a thumbnail to change its image. Click the badge to toggle featured.</p>
+            <p class="text-gray-500 text-sm mt-0.5">Hover over a thumbnail to change image. Click badge to toggle featured.</p>
           </div>
           <button onclick="openProdModal()"
-                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl
-                         hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-            </svg>
+                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             Add Product
           </button>
         </div>
         <div id="products-list" class="space-y-3 max-w-2xl">
+          <p class="text-gray-400 text-sm italic">Loading…</p>
+        </div>
+      </div>
+
+      <!-- ── OFFERS (NEW) ──────────────────────────── -->
+      <div data-panel="offers" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-primary font-poppins">Offers</h2>
+            <p class="text-gray-500 text-sm mt-0.5">Active offers appear on the homepage. Section is hidden when empty.</p>
+          </div>
+          <button onclick="openOfferModal()"
+                  class="bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm flex items-center gap-2">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add Offer
+          </button>
+        </div>
+        <div id="offers-admin-list" class="space-y-3 max-w-2xl">
           <p class="text-gray-400 text-sm italic">Loading…</p>
         </div>
       </div>
@@ -345,31 +331,34 @@
         <h2 class="text-xl font-bold text-primary font-poppins mb-6">Store Gallery</h2>
 
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 max-w-2xl mb-8">
-          <h3 class="font-semibold text-gray-800 font-poppins mb-4 text-sm">Upload from Device</h3>
+          <h3 class="font-semibold text-gray-800 font-poppins mb-4 text-sm">Upload Image</h3>
+
+          <!-- File input + button on same row -->
           <div class="flex items-center gap-3 flex-wrap">
             <input id="store-img-file" type="file" accept="image/*"
-                   class="admin-input flex-1 min-w-0
-                          file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
-                          file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-                          hover:file:bg-accent/20" />
+                   class="admin-input flex-1 min-w-0 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
+                          file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
             <button id="upload-gallery-btn" onclick="uploadStoreImage()"
-                    class="bg-accent text-white font-semibold font-poppins px-5 py-2.5
-                           rounded-xl hover:bg-accent/90 transition-colors text-sm flex-shrink-0">
+                    class="flex-shrink-0 bg-accent text-white font-semibold font-poppins px-5 py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
               Upload Image
             </button>
           </div>
+
+          <!-- Progress bar -->
           <div id="gallery-prog-wrap" class="hidden mt-3">
             <div class="progress-track"><div id="gallery-prog-bar" class="progress-fill"></div></div>
-            <p class="text-xs text-gray-400 mt-1">Uploading to Cloudinary…</p>
           </div>
 
+          <!-- Upload status text (success/error) -->
+          <p id="gallery-upload-status" class="text-xs mt-2"></p>
+
+          <!-- URL fallback -->
           <div class="mt-5 pt-5 border-t border-gray-100">
             <p class="text-xs text-gray-500 font-medium mb-2">Or add by direct image URL (fallback)</p>
             <div class="flex gap-2">
               <input id="gallery-url-input" type="url" class="admin-input flex-1" placeholder="https://example.com/image.jpg" />
               <button onclick="addImageByUrl()"
-                      class="flex-shrink-0 border border-accent text-accent font-semibold text-xs
-                             px-4 py-2 rounded-lg hover:bg-accent hover:text-white transition-all">
+                      class="flex-shrink-0 border border-accent text-accent font-semibold text-xs px-4 py-2 rounded-lg hover:bg-accent hover:text-white transition-all">
                 Add URL
               </button>
             </div>
@@ -391,7 +380,7 @@
       </div>
 
     </main>
-  </div><!-- /admin-panel -->
+  </div>
 
   <!-- ════════════════════════════════════════════
        CATEGORY MODAL
@@ -400,20 +389,14 @@
     <div class="modal-box p-6 sm:p-8">
       <div class="flex items-center justify-between mb-6">
         <h3 id="cat-modal-title" class="text-lg font-bold text-primary font-poppins">Add Category</h3>
-        <button onclick="closeCatModal()" class="text-gray-400 hover:text-gray-700 transition-colors p-1">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+        <button onclick="closeCatModal()" class="text-gray-400 hover:text-gray-700 p-1">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-
       <input type="hidden" id="cat-edit-id" />
-
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">
-            Category Name <span class="text-red-400">*</span>
-          </label>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Category Name <span class="text-red-400">*</span></label>
           <input id="cat-name" type="text" class="admin-input" placeholder="e.g. Dairy" />
         </div>
         <div>
@@ -423,9 +406,7 @@
         <div>
           <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Upload Image</label>
           <input id="cat-image-file" type="file" accept="image/*"
-                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
-                        file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-                        hover:file:bg-accent/20" />
+                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
           <div id="cat-prog-wrap" class="hidden mt-2">
             <div class="progress-track"><div id="cat-prog-bar" class="progress-fill"></div></div>
             <p class="text-xs text-gray-400 mt-1">Uploading…</p>
@@ -437,16 +418,13 @@
           <p class="text-xs text-gray-400 mt-1">Used only if no file is selected above.</p>
         </div>
       </div>
-
       <div class="flex gap-3 mt-6">
         <button id="save-cat-btn" onclick="saveCategoryForm()"
-                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5
-                       rounded-xl hover:bg-accent/90 transition-colors text-sm">
+                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
           Save Category
         </button>
         <button onclick="closeCatModal()"
-                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins
-                       py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
           Cancel
         </button>
       </div>
@@ -460,28 +438,20 @@
     <div class="modal-box p-6 sm:p-8">
       <div class="flex items-center justify-between mb-6">
         <h3 id="prod-modal-title" class="text-lg font-bold text-primary font-poppins">Add Product</h3>
-        <button onclick="closeProdModal()" class="text-gray-400 hover:text-gray-700 transition-colors p-1">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+        <button onclick="closeProdModal()" class="text-gray-400 hover:text-gray-700 p-1">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
-
       <input type="hidden" id="prod-edit-id" />
-
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">
-            Product Name <span class="text-red-400">*</span>
-          </label>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Product Name <span class="text-red-400">*</span></label>
           <input id="prod-name" type="text" class="admin-input" placeholder="e.g. Milk" />
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Upload Image</label>
           <input id="prod-image-file" type="file" accept="image/*"
-                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0
-                        file:text-xs file:font-semibold file:bg-accent/10 file:text-accent
-                        hover:file:bg-accent/20" />
+                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
           <div id="prod-prog-wrap" class="hidden mt-2">
             <div class="progress-track"><div id="prod-prog-bar" class="progress-fill"></div></div>
             <p class="text-xs text-gray-400 mt-1">Uploading…</p>
@@ -494,21 +464,66 @@
         </div>
         <div class="flex items-center gap-3 p-3 bg-bglight rounded-xl">
           <input id="prod-featured" type="checkbox" class="w-4 h-4 accent-[#2EC4B6] rounded cursor-pointer" />
-          <label for="prod-featured" class="text-sm font-semibold text-gray-700 font-poppins cursor-pointer">
-            Show as Featured Product on Homepage
-          </label>
+          <label for="prod-featured" class="text-sm font-semibold text-gray-700 font-poppins cursor-pointer">Show as Featured Product on Homepage</label>
         </div>
       </div>
-
       <div class="flex gap-3 mt-6">
         <button id="save-prod-btn" onclick="saveProductForm()"
-                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5
-                       rounded-xl hover:bg-accent/90 transition-colors text-sm">
+                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
           Save Product
         </button>
         <button onclick="closeProdModal()"
-                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins
-                       py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       OFFER MODAL (NEW)
+  ═════════════════════════════════════════════ -->
+  <div id="offer-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6 sm:p-8">
+      <div class="flex items-center justify-between mb-6">
+        <h3 id="offer-modal-title" class="text-lg font-bold text-primary font-poppins">Add Offer</h3>
+        <button onclick="closeOfferModal()" class="text-gray-400 hover:text-gray-700 p-1">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <input type="hidden" id="offer-edit-id" />
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Offer Title <span class="text-red-400">*</span></label>
+          <input id="offer-title" type="text" class="admin-input" placeholder="e.g. Buy 2 Get 1 Free on Rice" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Description</label>
+          <textarea id="offer-description" rows="3" class="admin-input resize-none"
+                    placeholder="Describe the offer details…"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Upload Image <span class="text-gray-400 font-normal">(optional)</span></label>
+          <input id="offer-image-file" type="file" accept="image/*"
+                 class="admin-input file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20" />
+          <div id="offer-prog-wrap" class="hidden mt-2">
+            <div class="progress-track"><div id="offer-prog-bar" class="progress-fill"></div></div>
+            <p class="text-xs text-gray-400 mt-1">Uploading…</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Or Paste Image URL <span class="text-gray-400 font-normal">(optional)</span></label>
+          <input id="offer-image-url" type="url" class="admin-input" placeholder="https://…" />
+          <p class="text-xs text-gray-400 mt-1">Used only if no file is selected above.</p>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button id="save-offer-btn" onclick="saveOfferForm()"
+                class="flex-1 bg-accent text-white font-semibold font-poppins py-2.5 rounded-xl hover:bg-accent/90 transition-colors text-sm">
+          Save Offer
+        </button>
+        <button onclick="closeOfferModal()"
+                class="flex-1 border border-gray-300 text-gray-600 font-semibold font-poppins py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm">
           Cancel
         </button>
       </div>
