@@ -694,7 +694,7 @@ window.deleteProductConfirm = async function (id, name) {
 async function loadStoreImages() {
   setLoading("store-images-grid", "Loading images…");
   try {
-    const snap = await getDocs(collection(db, "storeImages"));
+    const snap = await getDocs(collection(db, "gallery"));
     storeImages = [];
     snap.forEach(d => storeImages.push({ id: d.id, ...d.data() }));
   } catch (err) {
@@ -757,7 +757,7 @@ window.uploadStoreImage = async function () {
     const url = await uploadToCloudinary(file, "gallery-prog-bar", "gallery-prog-wrap");
 
     // Save to Firestore
-    await addDoc(collection(db, "storeImages"), {
+    await addDoc(collection(db, "gallery"), {
       imageUrl:  url,
       createdAt: serverTimestamp(),
     });
@@ -785,7 +785,7 @@ window.addImageByUrl = async function () {
   const url   = input?.value.trim();
   if (!url) { showToast("error", "Please enter an image URL."); return; }
   try {
-    await addDoc(collection(db, "storeImages"), { imageUrl: url, createdAt: serverTimestamp() });
+    await addDoc(collection(db, "gallery"), { imageUrl: url, createdAt: serverTimestamp() });
     if (input) input.value = "";
     showToast("success", "Image added by URL!");
     await loadStoreImages();
@@ -798,7 +798,7 @@ window.deleteStoreImageConfirm = async function (id) {
   const ok = await confirmDelete("this gallery image");
   if (!ok) return;
   try {
-    await deleteDoc(doc(db, "storeImages", id));
+    await deleteDoc(doc(db, "gallery", id));
     showToast("success", "Gallery image deleted.");
     await loadStoreImages();
   } catch (err) {
