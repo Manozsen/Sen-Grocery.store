@@ -1,7 +1,7 @@
 // ============================================================
 // admin.js — Admin panel logic
 // Auth: Firebase Auth + Firestore role check (users/{uid}.role === "admin")
-// Images: Cloudinary unsigned upload
+// Images: Cloudinary unsigned upload (no Firebase Storage)
 // ============================================================
 
 import { db, auth } from "./firebase.js";
@@ -21,58 +21,49 @@ const CLOUDINARY_URL    = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/i
 // ── DOM helper ────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 
-// ── Local state ───────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────
 let categories  = [];
 let products    = [];
 let storeImages = [];
 let reviews     = [];
+let offers      = [];
 
 // ============================================================
-// TOAST NOTIFICATION SYSTEM
-// Replaces all alert() / showMsg() calls
+// TOAST NOTIFICATIONS
 // ============================================================
 function showToast(type, message) {
   const container = $("toast-container");
   if (!container) return;
 
-  const isSuccess = type === "success";
+  const ok    = type === "success";
   const toast = document.createElement("div");
 
   toast.className = [
-    "flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg",
-    "text-sm font-medium text-white font-poppins max-w-sm",
-    "transform transition-all duration-300",
-    "translate-x-0 opacity-0",          // start hidden
-    isSuccess ? "bg-green-500" : "bg-red-500",
+    "flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white",
+    "font-poppins max-w-sm opacity-0 transition-all duration-300",
+    ok ? "bg-green-500" : "bg-red-500",
   ].join(" ");
 
   toast.innerHTML = `
-    <span class="flex-shrink-0 text-base">${isSuccess ? "✓" : "✗"}</span>
+    <span class="flex-shrink-0">${ok ? "✓" : "✗"}</span>
     <span class="flex-1 leading-snug">${esc(message)}</span>
     <button onclick="this.parentElement.remove()"
-            class="flex-shrink-0 text-white/70 hover:text-white ml-1 text-lg leading-none">×</button>
-  `;
+            class="flex-shrink-0 text-white/70 hover:text-white text-lg leading-none ml-1">×</button>`;
 
   container.appendChild(toast);
 
-  // Animate in (next tick)
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      toast.classList.remove("opacity-0");
-      toast.classList.add("opacity-100");
-    });
-  });
+  // Animate in
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.replace("opacity-0", "opacity-100")));
 
-  // Auto-remove after 3 seconds
+  // Auto-dismiss after 3 s
   setTimeout(() => {
-    toast.classList.add("opacity-0", "translate-x-full");
+    toast.classList.replace("opacity-100", "opacity-0");
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
 
 // ============================================================
-// DELETE CONFIRMATION MODAL
-// Returns a Promise<boolean> — true if admin confirmed delete
+// DELETE CONFIRMATION MODAL — returns Promise<boolean>
 // ============================================================
 function confirmDelete(itemLabel = "this item") {
   return new Promise((resolve) => {
@@ -83,27 +74,19 @@ function confirmDelete(itemLabel = "this item") {
 
     if (!modal) { resolve(false); return; }
 
-    // Set message
     if (msgEl) {
-      msgEl.textContent = `Are you sure you want to delete ${itemLabel}? This action cannot be undone.`;
+      msgEl.textContent = `Are you sure you want to delete ${itemLabel}? This cannot be undone.`;
     }
 
     modal.classList.remove("hidden");
 
-    // One-shot event listeners — cleaned up after use
-    function onConfirm() {
-      cleanup();
-      resolve(true);
-    }
-    function onCancel() {
-      cleanup();
-      resolve(false);
-    }
     function cleanup() {
       modal.classList.add("hidden");
       confirmBtn.removeEventListener("click", onConfirm);
       cancelBtn.removeEventListener("click",  onCancel);
     }
+    function onConfirm() { cleanup(); resolve(true); }
+    function onCancel()  { cleanup(); resolve(false); }
 
     confirmBtn.addEventListener("click", onConfirm);
     cancelBtn.addEventListener("click",  onCancel);
@@ -133,21 +116,34 @@ function setProgress(barId, wrapId, pct) {
   const bar  = $(barId);
   const wrap = $(wrapId);
   if (bar)  bar.style.width = `${pct}%`;
-  if (wrap) wrap.classList.toggle("hidden", pct === 0 || pct === 100);
+  if (wrap) {
+    // Show wrap when uploading (pct > 0 and pct < 100)
+    if (pct > 0 && pct < 100) {
+      wrap.classList.remove("hidden");
+    } else {
+      wrap.classList.add("hidden");
+    }
+  }
 }
 
 // ============================================================
 // CLOUDINARY UPLOAD
+// Fixed: uses XHR with proper progress events; returns secure_url
 // ============================================================
-async function uploadToCloudinary(file, barId, wrapId) {
+function uploadToCloudinary(file, barId, wrapId) {
   return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error("No file provided."));
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file",          file);
     formData.append("upload_preset", CLOUDINARY_PRESET);
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", CLOUDINARY_URL);
 
+    // Show progress bar if IDs provided
     if (barId && wrapId) {
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
@@ -158,37 +154,43 @@ async function uploadToCloudinary(file, barId, wrapId) {
 
     xhr.onload = () => {
       if (xhr.status === 200) {
-        resolve(JSON.parse(xhr.responseText).secure_url);
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.secure_url) {
+            resolve(data.secure_url);
+          } else {
+            reject(new Error("Cloudinary did not return a secure_url."));
+          }
+        } catch {
+          reject(new Error("Failed to parse Cloudinary response."));
+        }
       } else {
-        reject(new Error(`Cloudinary error (${xhr.status})`));
+        reject(new Error(`Cloudinary upload failed (HTTP ${xhr.status}).`));
       }
     };
-    xhr.onerror = () => reject(new Error("Network error during upload."));
+
+    xhr.onerror   = () => reject(new Error("Network error during upload. Check your connection."));
+    xhr.ontimeout = () => reject(new Error("Upload timed out. Please try again."));
+    xhr.timeout   = 60000; // 60-second timeout
+
+    xhr.open("POST", CLOUDINARY_URL);
     xhr.send(formData);
   });
 }
 
 // ============================================================
-// AUTH — Firestore role-based access
-// users/{uid}.role must equal "admin"
+// AUTH — Firestore role check
 // ============================================================
 function initAuth() {
   onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      showLoginScreen();
-      return;
-    }
+    if (!user) { showLoginScreen(); return; }
 
-    // ── Role check via Firestore ─────────────────────────────
     try {
       const userSnap = await getDoc(doc(db, "users", user.uid));
-
       if (userSnap.exists() && userSnap.data().role === "admin") {
-        // ✅ Verified admin
         showAdminPanel(user.email);
         loadAllData();
       } else {
-        // ❌ Authenticated but not admin
         await signOut(auth);
         showLoginScreen();
         setLoginError("Access denied. Your account does not have admin privileges.");
@@ -201,7 +203,6 @@ function initAuth() {
     }
   });
 
-  // ── Login form ───────────────────────────────────────────
   $("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = $("login-email").value.trim();
@@ -214,7 +215,6 @@ function initAuth() {
 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged handles the rest
     } catch {
       setLoginError("Incorrect email or password. Please try again.");
       btn.disabled    = false;
@@ -222,7 +222,6 @@ function initAuth() {
     }
   });
 
-  // ── Logout ───────────────────────────────────────────────
   $("logout-btn").addEventListener("click", async () => {
     await signOut(auth);
     showLoginScreen();
@@ -282,6 +281,7 @@ function loadAllData() {
   loadProducts();
   loadStoreImages();
   loadReviews();
+  loadOffers();
 }
 
 // ============================================================
@@ -300,7 +300,6 @@ async function loadSettings() {
       $("set-opentime").value  = s.openTime  || "";
       $("set-closetime").value = s.closeTime || "";
       $("set-maplink").value   = s.mapLink   || "";
-
       if (s.heroImage) updateHeroPreview(s.heroImage);
     }
   } catch (err) {
@@ -318,9 +317,11 @@ function updateHeroPreview(url) {
 }
 
 window.uploadHeroImage = async function () {
-  const file = $("hero-img-file")?.files[0];
-  const btn  = $("upload-hero-btn");
-  if (!file) { showToast("error", "Please select an image file."); return; }
+  const fileInput = $("hero-img-file");
+  const file      = fileInput?.files?.[0];
+  const btn       = $("upload-hero-btn");
+
+  if (!file) { showToast("error", "Please select an image file first."); return; }
 
   btn.disabled    = true;
   btn.textContent = "Uploading…";
@@ -328,9 +329,9 @@ window.uploadHeroImage = async function () {
   try {
     const url = await uploadToCloudinary(file, "hero-prog-bar", "hero-prog-wrap");
     await setDoc(doc(db, "settings", "main"), { heroImage: url }, { merge: true });
-    $("hero-img-file").value = "";
+    if (fileInput) fileInput.value = "";
     updateHeroPreview(url);
-    showToast("success", "Hero image updated successfully!");
+    showToast("success", "Hero image updated!");
   } catch (err) {
     showToast("error", "Upload failed: " + err.message);
   } finally {
@@ -356,7 +357,7 @@ window.saveSettings = async function () {
       closeTime: $("set-closetime").value.trim(),
       mapLink:   $("set-maplink").value.trim(),
     }, { merge: true });
-    showToast("success", "Settings saved successfully!");
+    showToast("success", "Settings saved!");
   } catch (err) {
     showToast("error", "Save failed: " + err.message);
   } finally {
@@ -366,12 +367,12 @@ window.saveSettings = async function () {
 };
 
 // ============================================================
-// CATEGORIES — Full CRUD + inline image replace
+// CATEGORIES
 // ============================================================
 async function loadCategories() {
   setLoading("categories-list");
   try {
-    const q    = query(collection(db, "categories"), orderBy("order", "asc"));
+    const q = query(collection(db, "categories"), orderBy("order", "asc"));
     const snap = await getDocs(q);
     categories = [];
     snap.forEach(d => categories.push({ id: d.id, ...d.data() }));
@@ -387,13 +388,7 @@ function renderCategoriesList() {
   if (!list) return;
 
   if (!categories.length) {
-    list.innerHTML = `
-      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-        </svg>
-        <p class="text-sm font-medium">No categories yet. Add your first category above.</p>
-      </div>`;
+    list.innerHTML = `<div class="py-10 text-center text-gray-400 text-sm bg-white rounded-xl border border-dashed border-gray-200">No categories yet. Add one above.</div>`;
     return;
   }
 
@@ -406,13 +401,8 @@ function renderCategoriesList() {
     div.innerHTML = `
       <!-- Thumbnail with hover-to-change -->
       <div class="relative flex-shrink-0 group/thumb w-14 h-14">
-        <img
-          id="cat-thumb-${cat.id}"
-          src="${escAttr(cat.imageUrl || ph)}"
-          onerror="this.src='${ph}'"
-          class="w-14 h-14 rounded-lg object-cover bg-gray-100 block"
-          alt="${escAttr(cat.name)}"
-        />
+        <img id="cat-thumb-${cat.id}" src="${escAttr(cat.imageUrl || ph)}" onerror="this.src='${ph}'"
+             class="w-14 h-14 rounded-lg object-cover bg-gray-100 block" alt="${escAttr(cat.name)}" />
         <label for="cat-inline-file-${cat.id}" title="Click to change image"
                class="absolute inset-0 bg-black/55 rounded-lg flex items-center justify-center
                       opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer">
@@ -424,15 +414,11 @@ function renderCategoriesList() {
         <input type="file" id="cat-inline-file-${cat.id}" accept="image/*" class="hidden"
                onchange="replaceCategoryImage('${cat.id}', this)" />
       </div>
-
-      <!-- Info -->
       <div class="flex-1 min-w-0">
         <p class="font-semibold text-gray-800 font-poppins truncate">${esc(cat.name)}</p>
         <p class="text-xs text-gray-400">Order: ${cat.order ?? 0}</p>
         <p id="cat-img-status-${cat.id}" class="text-xs font-medium mt-0.5 hidden"></p>
       </div>
-
-      <!-- Actions -->
       <div class="flex gap-2 flex-shrink-0">
         <button onclick="openCatModal('${cat.id}')"
                 class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
@@ -443,7 +429,6 @@ function renderCategoriesList() {
   });
 }
 
-// Inline image replace (hover on thumbnail)
 window.replaceCategoryImage = async function (catId, inputEl) {
   const file = inputEl?.files?.[0];
   if (!file) return;
@@ -452,47 +437,26 @@ window.replaceCategoryImage = async function (catId, inputEl) {
   const status = $(`cat-img-status-${catId}`);
 
   if (thumb)  thumb.style.opacity = "0.4";
-  if (status) {
-    status.textContent = "Uploading…";
-    status.className   = "text-xs font-medium mt-0.5 text-accent";
-    status.classList.remove("hidden");
-  }
+  if (status) { status.textContent = "Uploading…"; status.className = "text-xs font-medium mt-0.5 text-accent"; status.classList.remove("hidden"); }
 
   try {
     const url = await uploadToCloudinary(file, null, null);
     await updateDoc(doc(db, "categories", catId), { imageUrl: url });
-
     if (thumb)  { thumb.src = url; thumb.style.opacity = "1"; }
     if (status) { status.textContent = "✓ Updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
     setTimeout(() => status?.classList.add("hidden"), 3000);
-
     const cat = categories.find(c => c.id === catId);
     if (cat) cat.imageUrl = url;
-
     showToast("success", "Category image updated!");
   } catch (err) {
     if (thumb)  thumb.style.opacity = "1";
-    if (status) { status.textContent = "✗ Failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
+    if (status) { status.textContent = "✗ Upload failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
     showToast("error", "Image upload failed: " + err.message);
   } finally {
-    inputEl.value = "";
+    if (inputEl) inputEl.value = "";
   }
 };
 
-// Delete with confirmation modal
-window.deleteCategoryConfirm = async function (id, name) {
-  const confirmed = await confirmDelete(`the category "${name}"`);
-  if (!confirmed) return;
-  try {
-    await deleteDoc(doc(db, "categories", id));
-    showToast("success", `Category "${name}" deleted.`);
-    await loadCategories();
-  } catch (err) {
-    showToast("error", "Delete failed: " + err.message);
-  }
-};
-
-// Modal open/close
 window.openCatModal = function (id = "") {
   const cat = id ? categories.find(c => c.id === id) : null;
   $("cat-modal-title").textContent = cat ? "Edit Category" : "Add Category";
@@ -511,7 +475,7 @@ window.saveCategoryForm = async function () {
   const name  = $("cat-name").value.trim();
   const order = parseInt($("cat-order").value) || 0;
   let   url   = $("cat-image-url").value.trim();
-  const file  = $("cat-image-file").files[0];
+  const file  = $("cat-image-file")?.files?.[0];
   const btn   = $("save-cat-btn");
 
   if (!name) { showToast("error", "Category name is required."); return; }
@@ -530,7 +494,6 @@ window.saveCategoryForm = async function () {
       await addDoc(collection(db, "categories"), data);
       showToast("success", `Category "${name}" added!`);
     }
-
     window.closeCatModal();
     await loadCategories();
   } catch (err) {
@@ -542,8 +505,20 @@ window.saveCategoryForm = async function () {
   }
 };
 
+window.deleteCategoryConfirm = async function (id, name) {
+  const ok = await confirmDelete(`the category "${name}"`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "categories", id));
+    showToast("success", `Category "${name}" deleted.`);
+    await loadCategories();
+  } catch (err) {
+    showToast("error", "Delete failed: " + err.message);
+  }
+};
+
 // ============================================================
-// PRODUCTS — Full CRUD + inline image replace + isFeatured toggle
+// PRODUCTS
 // ============================================================
 async function loadProducts() {
   setLoading("products-list");
@@ -563,13 +538,7 @@ function renderProductsList() {
   if (!list) return;
 
   if (!products.length) {
-    list.innerHTML = `
-      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-        </svg>
-        <p class="text-sm font-medium">No products yet. Add your first product above.</p>
-      </div>`;
+    list.innerHTML = `<div class="py-10 text-center text-gray-400 text-sm bg-white rounded-xl border border-dashed border-gray-200">No products yet. Add one above.</div>`;
     return;
   }
 
@@ -580,15 +549,9 @@ function renderProductsList() {
     div.id        = `prod-row-${p.id}`;
     div.className = "flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-accent/40 transition-colors";
     div.innerHTML = `
-      <!-- Thumbnail with hover-to-change -->
       <div class="relative flex-shrink-0 group/thumb w-14 h-14">
-        <img
-          id="prod-thumb-${p.id}"
-          src="${escAttr(p.imageUrl || ph)}"
-          onerror="this.src='${ph}'"
-          class="w-14 h-14 rounded-lg object-cover bg-gray-100 block"
-          alt="${escAttr(p.name)}"
-        />
+        <img id="prod-thumb-${p.id}" src="${escAttr(p.imageUrl || ph)}" onerror="this.src='${ph}'"
+             class="w-14 h-14 rounded-lg object-cover bg-gray-100 block" alt="${escAttr(p.name)}" />
         <label for="prod-inline-file-${p.id}" title="Click to change image"
                class="absolute inset-0 bg-black/55 rounded-lg flex items-center justify-center
                       opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer">
@@ -600,28 +563,16 @@ function renderProductsList() {
         <input type="file" id="prod-inline-file-${p.id}" accept="image/*" class="hidden"
                onchange="replaceProductImage('${p.id}', this)" />
       </div>
-
-      <!-- Info -->
       <div class="flex-1 min-w-0">
         <p class="font-semibold text-gray-800 font-poppins truncate">${esc(p.name)}</p>
-
-        <!-- isFeatured toggle -->
-        <button
-          id="feat-btn-${p.id}"
-          onclick="toggleFeatured('${p.id}')"
-          class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full mt-1 font-semibold transition-all
-                 ${p.isFeatured
-                   ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
-                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}"
-        >
+        <button id="feat-btn-${p.id}" onclick="toggleFeatured('${p.id}')"
+                class="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full mt-1 font-semibold transition-all
+                       ${p.isFeatured ? 'bg-teal-100 text-teal-700 hover:bg-teal-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}">
           <span>${p.isFeatured ? "⭐" : "☆"}</span>
           <span id="feat-label-${p.id}">${p.isFeatured ? "Featured" : "Regular"}</span>
         </button>
-
         <p id="prod-img-status-${p.id}" class="text-xs font-medium mt-0.5 hidden"></p>
       </div>
-
-      <!-- Actions -->
       <div class="flex gap-2 flex-shrink-0">
         <button onclick="openProdModal('${p.id}')"
                 class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
@@ -632,81 +583,49 @@ function renderProductsList() {
   });
 }
 
-// Toggle isFeatured inline (no modal needed)
 window.toggleFeatured = async function (prodId) {
   const prod = products.find(p => p.id === prodId);
   if (!prod) return;
-
   const newVal = !prod.isFeatured;
-  const btn    = $(`feat-btn-${prodId}`);
-  const label  = $(`feat-label-${prodId}`);
-
   try {
     await updateDoc(doc(db, "products", prodId), { isFeatured: newVal });
     prod.isFeatured = newVal;
-
+    const btn   = $(`feat-btn-${prodId}`);
+    const label = $(`feat-label-${prodId}`);
     if (btn) {
-      btn.className = btn.className
-        .replace(/bg-\S+|text-\S+-\d+|hover:bg-\S+/g, "")
-        .trim();
-      btn.className += newVal
-        ? " bg-teal-100 text-teal-700 hover:bg-teal-200"
-        : " bg-gray-100 text-gray-500 hover:bg-gray-200";
+      btn.className = btn.className.replace(/bg-\S+|text-\S+-\d+|hover:bg-\S+/g, "").trim()
+        + (newVal ? " bg-teal-100 text-teal-700 hover:bg-teal-200" : " bg-gray-100 text-gray-500 hover:bg-gray-200");
       btn.querySelector("span").textContent = newVal ? "⭐" : "☆";
     }
     if (label) label.textContent = newVal ? "Featured" : "Regular";
-
     showToast("success", `"${prod.name}" is now ${newVal ? "featured" : "regular"}.`);
   } catch (err) {
     showToast("error", "Toggle failed: " + err.message);
   }
 };
 
-// Inline image replace
 window.replaceProductImage = async function (prodId, inputEl) {
   const file = inputEl?.files?.[0];
   if (!file) return;
-
   const thumb  = $(`prod-thumb-${prodId}`);
   const status = $(`prod-img-status-${prodId}`);
-
   if (thumb)  thumb.style.opacity = "0.4";
-  if (status) {
-    status.textContent = "Uploading…";
-    status.className   = "text-xs font-medium mt-0.5 text-accent";
-    status.classList.remove("hidden");
-  }
-
+  if (status) { status.textContent = "Uploading…"; status.className = "text-xs font-medium mt-0.5 text-accent"; status.classList.remove("hidden"); }
   try {
     const url = await uploadToCloudinary(file, null, null);
     await updateDoc(doc(db, "products", prodId), { imageUrl: url });
-
     if (thumb)  { thumb.src = url; thumb.style.opacity = "1"; }
     if (status) { status.textContent = "✓ Updated!"; status.className = "text-xs font-medium mt-0.5 text-green-600"; }
     setTimeout(() => status?.classList.add("hidden"), 3000);
-
     const prod = products.find(p => p.id === prodId);
     if (prod) prod.imageUrl = url;
-
     showToast("success", "Product image updated!");
   } catch (err) {
     if (thumb)  thumb.style.opacity = "1";
-    if (status) { status.textContent = "✗ Failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
+    if (status) { status.textContent = "✗ Upload failed"; status.className = "text-xs font-medium mt-0.5 text-red-500"; }
     showToast("error", "Image upload failed: " + err.message);
   } finally {
-    inputEl.value = "";
-  }
-};
-
-window.deleteProductConfirm = async function (id, name) {
-  const confirmed = await confirmDelete(`the product "${name}"`);
-  if (!confirmed) return;
-  try {
-    await deleteDoc(doc(db, "products", id));
-    showToast("success", `Product "${name}" deleted.`);
-    await loadProducts();
-  } catch (err) {
-    showToast("error", "Delete failed: " + err.message);
+    if (inputEl) inputEl.value = "";
   }
 };
 
@@ -728,7 +647,7 @@ window.saveProductForm = async function () {
   const name       = $("prod-name").value.trim();
   let   url        = $("prod-image-url").value.trim();
   const isFeatured = $("prod-featured").checked;
-  const file       = $("prod-image-file").files[0];
+  const file       = $("prod-image-file")?.files?.[0];
   const btn        = $("save-prod-btn");
 
   if (!name) { showToast("error", "Product name is required."); return; }
@@ -738,7 +657,6 @@ window.saveProductForm = async function () {
 
   try {
     if (file) url = await uploadToCloudinary(file, "prod-prog-bar", "prod-prog-wrap");
-
     const data = { name, imageUrl: url || "", isFeatured };
     if (id) {
       await updateDoc(doc(db, "products", id), data);
@@ -747,7 +665,6 @@ window.saveProductForm = async function () {
       await addDoc(collection(db, "products"), data);
       showToast("success", `Product "${name}" added!`);
     }
-
     window.closeProdModal();
     await loadProducts();
   } catch (err) {
@@ -759,8 +676,20 @@ window.saveProductForm = async function () {
   }
 };
 
+window.deleteProductConfirm = async function (id, name) {
+  const ok = await confirmDelete(`the product "${name}"`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "products", id));
+    showToast("success", `Product "${name}" deleted.`);
+    await loadProducts();
+  } catch (err) {
+    showToast("error", "Delete failed: " + err.message);
+  }
+};
+
 // ============================================================
-// STORE IMAGES (Gallery)
+// GALLERY — Fixed file upload
 // ============================================================
 async function loadStoreImages() {
   setLoading("store-images-grid", "Loading images…");
@@ -789,8 +718,7 @@ function renderStoreImages() {
     const div = document.createElement("div");
     div.className = "relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm";
     div.innerHTML = `
-      <img src="${escAttr(img.imageUrl)}" alt="Store image"
-           class="w-full h-36 object-cover"
+      <img src="${escAttr(img.imageUrl)}" alt="Store image" class="w-full h-36 object-cover"
            onerror="this.src='https://placehold.co/300x150/e5e7eb/9ca3af?text=Error'" />
       <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <button onclick="deleteStoreImageConfirm('${img.id}')"
@@ -802,21 +730,48 @@ function renderStoreImages() {
   });
 }
 
+// FIXED gallery upload — clear state properly, check file before upload
 window.uploadStoreImage = async function () {
-  const file = $("store-img-file")?.files[0];
-  const btn  = $("upload-gallery-btn");
-  if (!file) { showToast("error", "Please select an image."); return; }
+  const fileInput = $("store-img-file");
+  const btn       = $("upload-gallery-btn");
+  const statusEl  = $("gallery-upload-status");
 
+  // Guard: ensure file input exists and has a file
+  if (!fileInput) {
+    showToast("error", "File input not found.");
+    return;
+  }
+
+  const file = fileInput.files?.[0];
+  if (!file) {
+    showToast("error", "Please select an image file first.");
+    return;
+  }
+
+  // Show loading state
   btn.disabled    = true;
   btn.textContent = "Uploading…";
+  if (statusEl) { statusEl.textContent = "Uploading image…"; statusEl.className = "text-xs text-accent font-medium mt-2"; }
 
   try {
     const url = await uploadToCloudinary(file, "gallery-prog-bar", "gallery-prog-wrap");
-    await addDoc(collection(db, "storeImages"), { imageUrl: url, createdAt: serverTimestamp() });
-    $("store-img-file").value = "";
+
+    // Save to Firestore
+    await addDoc(collection(db, "storeImages"), {
+      imageUrl:  url,
+      createdAt: serverTimestamp(),
+    });
+
+    // Reset file input
+    fileInput.value = "";
+    if (statusEl) { statusEl.textContent = "✓ Image uploaded successfully!"; statusEl.className = "text-xs text-green-600 font-medium mt-2"; }
+    setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 3000);
+
     showToast("success", "Gallery image uploaded!");
     await loadStoreImages();
   } catch (err) {
+    console.error("[Gallery] Upload failed:", err);
+    if (statusEl) { statusEl.textContent = "✗ Upload failed: " + err.message; statusEl.className = "text-xs text-red-500 font-medium mt-2"; }
     showToast("error", "Upload failed: " + err.message);
   } finally {
     btn.disabled    = false;
@@ -826,11 +781,12 @@ window.uploadStoreImage = async function () {
 };
 
 window.addImageByUrl = async function () {
-  const url = $("gallery-url-input")?.value.trim();
+  const input = $("gallery-url-input");
+  const url   = input?.value.trim();
   if (!url) { showToast("error", "Please enter an image URL."); return; }
   try {
     await addDoc(collection(db, "storeImages"), { imageUrl: url, createdAt: serverTimestamp() });
-    $("gallery-url-input").value = "";
+    if (input) input.value = "";
     showToast("success", "Image added by URL!");
     await loadStoreImages();
   } catch (err) {
@@ -839,8 +795,8 @@ window.addImageByUrl = async function () {
 };
 
 window.deleteStoreImageConfirm = async function (id) {
-  const confirmed = await confirmDelete("this gallery image");
-  if (!confirmed) return;
+  const ok = await confirmDelete("this gallery image");
+  if (!ok) return;
   try {
     await deleteDoc(doc(db, "storeImages", id));
     showToast("success", "Gallery image deleted.");
@@ -851,7 +807,127 @@ window.deleteStoreImageConfirm = async function (id) {
 };
 
 // ============================================================
-// REVIEWS — Edit & Delete
+// OFFERS — Full CRUD (NEW)
+// ============================================================
+async function loadOffers() {
+  setLoading("offers-admin-list");
+  try {
+    const q = query(collection(db, "offers"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    offers = [];
+    snap.forEach(d => offers.push({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error("[Offers] Load failed:", err);
+    showToast("error", "Failed to load offers.");
+  }
+  renderOffersList();
+}
+
+function renderOffersList() {
+  const list = $("offers-admin-list");
+  if (!list) return;
+
+  if (!offers.length) {
+    list.innerHTML = `<div class="py-10 text-center text-gray-400 text-sm bg-white rounded-xl border border-dashed border-gray-200">No offers yet. Add one above.</div>`;
+    return;
+  }
+
+  list.innerHTML = "";
+  offers.forEach(offer => {
+    const ph  = offer.imageUrl
+      ? escAttr(offer.imageUrl)
+      : "https://placehold.co/56x56/e5e7eb/6b7280?text=?";
+
+    const div = document.createElement("div");
+    div.id        = `offer-row-${offer.id}`;
+    div.className = "flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-accent/40 transition-colors";
+    div.innerHTML = `
+      ${offer.imageUrl
+        ? `<img src="${ph}" onerror="this.style.display='none'"
+               class="w-14 h-14 rounded-lg object-cover flex-shrink-0 bg-gray-100" alt="${escAttr(offer.title)}" />`
+        : `<div class="w-14 h-14 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 text-accent text-xl">🏷️</div>`}
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-gray-800 font-poppins truncate">${esc(offer.title)}</p>
+        ${offer.description ? `<p class="text-xs text-gray-500 mt-0.5 line-clamp-2">${esc(offer.description)}</p>` : ""}
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <button onclick="openOfferModal('${offer.id}')"
+                class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
+        <button onclick="deleteOfferConfirm('${offer.id}', '${escAttr(offer.title)}')"
+                class="btn-admin-sm border-red-300 text-red-500 hover:bg-red-50">Delete</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+window.openOfferModal = function (id = "") {
+  const offer = id ? offers.find(o => o.id === id) : null;
+  $("offer-modal-title").textContent  = offer ? "Edit Offer" : "Add Offer";
+  $("offer-edit-id").value            = id;
+  $("offer-title").value              = offer?.title       || "";
+  $("offer-description").value        = offer?.description || "";
+  $("offer-image-url").value          = offer?.imageUrl    || "";
+  $("offer-image-file").value         = "";
+  $("offer-modal").classList.remove("hidden");
+};
+
+window.closeOfferModal = () => $("offer-modal").classList.add("hidden");
+
+window.saveOfferForm = async function () {
+  const id    = $("offer-edit-id").value;
+  const title = $("offer-title").value.trim();
+  const desc  = $("offer-description").value.trim();
+  let   url   = $("offer-image-url").value.trim();
+  const file  = $("offer-image-file")?.files?.[0];
+  const btn   = $("save-offer-btn");
+
+  if (!title) { showToast("error", "Offer title is required."); return; }
+
+  btn.disabled    = true;
+  btn.textContent = "Saving…";
+
+  try {
+    if (file) url = await uploadToCloudinary(file, "offer-prog-bar", "offer-prog-wrap");
+
+    const data = {
+      title,
+      description: desc,
+      imageUrl:    url || "",
+    };
+
+    if (id) {
+      await updateDoc(doc(db, "offers", id), data);
+      showToast("success", `Offer "${title}" updated!`);
+    } else {
+      await addDoc(collection(db, "offers"), { ...data, createdAt: serverTimestamp() });
+      showToast("success", `Offer "${title}" added!`);
+    }
+
+    window.closeOfferModal();
+    await loadOffers();
+  } catch (err) {
+    showToast("error", "Error: " + err.message);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "Save Offer";
+    setProgress("offer-prog-bar", "offer-prog-wrap", 0);
+  }
+};
+
+window.deleteOfferConfirm = async function (id, title) {
+  const ok = await confirmDelete(`the offer "${title}"`);
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, "offers", id));
+    showToast("success", `Offer "${title}" deleted.`);
+    await loadOffers();
+  } catch (err) {
+    showToast("error", "Delete failed: " + err.message);
+  }
+};
+
+// ============================================================
+// REVIEWS
 // ============================================================
 async function loadReviews() {
   setLoading("reviews-admin-list");
@@ -873,33 +949,23 @@ function renderReviews() {
   if (!list) return;
 
   if (!reviews.length) {
-    list.innerHTML = `
-      <div class="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-        <svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
-        <p class="text-sm font-medium">No reviews yet.</p>
-      </div>`;
+    list.innerHTML = `<div class="py-10 text-center text-gray-400 text-sm bg-white rounded-xl border border-dashed border-gray-200">No reviews yet.</div>`;
     return;
   }
 
   list.innerHTML = "";
   reviews.forEach(r => {
-    const div = document.createElement("div");
-    div.id        = `rev-${r.id}`;
-    div.className = "p-4 bg-white rounded-xl border border-gray-200";
-
-    // Format timestamp if available
     let dateStr = "";
     if (r.createdAt?.toDate) {
       dateStr = r.createdAt.toDate().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
     }
 
+    const div = document.createElement("div");
+    div.id        = `rev-${r.id}`;
+    div.className = "p-4 bg-white rounded-xl border border-gray-200";
     div.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0">
-
-          <!-- Display mode -->
           <div id="rev-display-${r.id}">
             <div class="flex items-center gap-2 mb-1">
               <p class="font-semibold text-gray-800 font-poppins text-sm">${esc(r.name)}</p>
@@ -907,8 +973,6 @@ function renderReviews() {
             </div>
             <p class="text-gray-500 text-sm italic leading-relaxed">"${esc(r.text)}"</p>
           </div>
-
-          <!-- Edit mode (hidden by default) -->
           <div id="rev-edit-${r.id}" class="hidden space-y-2 mt-1">
             <input type="text" id="rev-name-${r.id}" value="${escAttr(r.name)}"
                    class="admin-input w-full" placeholder="Name" />
@@ -916,8 +980,6 @@ function renderReviews() {
                       class="admin-input w-full resize-none" placeholder="Review text">${esc(r.text)}</textarea>
           </div>
         </div>
-
-        <!-- Action buttons -->
         <div class="flex flex-col gap-2 flex-shrink-0">
           <button id="rev-edit-btn-${r.id}" onclick="toggleEditReview('${r.id}')"
                   class="btn-admin-sm border-accent text-accent hover:bg-accent hover:text-white">Edit</button>
@@ -942,7 +1004,7 @@ window.saveReview = async function (id) {
   if (!name || !text) { showToast("error", "Name and review text are required."); return; }
   try {
     await updateDoc(doc(db, "reviews", id), { name, text });
-    showToast("success", "Review updated successfully!");
+    showToast("success", "Review updated!");
     await loadReviews();
   } catch (err) {
     showToast("error", "Update failed: " + err.message);
@@ -950,8 +1012,8 @@ window.saveReview = async function (id) {
 };
 
 window.deleteReviewConfirm = async function (id, name) {
-  const confirmed = await confirmDelete(`the review by "${name}"`);
-  if (!confirmed) return;
+  const ok = await confirmDelete(`the review by "${name}"`);
+  if (!ok) return;
   try {
     await deleteDoc(doc(db, "reviews", id));
     showToast("success", "Review deleted.");
