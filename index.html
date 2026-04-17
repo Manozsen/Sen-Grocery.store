@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- ── Primary SEO ───────────────────────────────────────── -->
   <meta name="description"
         content="Sen Grocery Store — Your trusted neighbourhood grocery shop near Kumlai Bridge, Demkajhora, Baradighi, Mal, Jalpaiguri since 1995. Fresh stock, best prices, wide variety of daily essentials." />
   <meta name="keywords"
@@ -13,34 +12,27 @@
   <meta name="robots"        content="index, follow" />
   <meta name="theme-color"   content="#0A2540" />
 
-  <!-- ── Open Graph (Facebook / WhatsApp previews) ─────────── -->
   <meta property="og:type"        content="website" />
   <meta property="og:locale"      content="en_IN" />
   <meta property="og:site_name"   content="Sen Grocery Store" />
   <meta property="og:title"       content="Sen Grocery Store – Trusted Since 1995" />
-  <meta property="og:description"
-        content="Fresh groceries, best prices, wide variety. Serving Baradighi, Mal, Jalpaiguri since 1995. Visit us at Kumlai Bridge, Demkajhora." />
-  <meta property="og:image"
-        content="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80" />
+  <meta property="og:description" content="Fresh groceries, best prices, wide variety. Serving Baradighi, Mal, Jalpaiguri since 1995. Visit us at Kumlai Bridge, Demkajhora." />
+  <meta property="og:image"       content="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80" />
   <meta property="og:image:width"  content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt"    content="Sen Grocery Store — Fresh groceries at best prices" />
 
-  <!-- ── Twitter Card ──────────────────────────────────────── -->
   <meta name="twitter:card"        content="summary_large_image" />
   <meta name="twitter:title"       content="Sen Grocery Store – Trusted Since 1995" />
   <meta name="twitter:description" content="Fresh groceries, best prices. Serving Baradighi, Jalpaiguri since 1995." />
-  <meta name="twitter:image"
-        content="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80" />
+  <meta name="twitter:image"       content="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80" />
 
   <title>Sen Grocery Store – Trusted Since 1995 | Baradighi, Jalpaiguri</title>
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -60,7 +52,6 @@
     };
   </script>
 
-  <!-- AOS -->
   <link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css" />
 
   <style>
@@ -86,6 +77,17 @@
       background: rgba(10,37,64,0.97) !important;
       backdrop-filter: blur(14px);
       box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+    }
+
+    /* ── Navbar logo image ── */
+    .nav-logo-img {
+      height: 44px;      /* desktop */
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    @media (max-width: 640px) {
+      .nav-logo-img { height: 32px; } /* mobile */
     }
 
     /* ── Section badge ── */
@@ -151,13 +153,14 @@
 
     /* ── WhatsApp float ── */
     .wa-float {
-      position: fixed; bottom: 1.75rem; right: 1.75rem; z-index: 999;
-      width: 3.5rem; height: 3.5rem; border-radius: 50%;
-      background: #25D366; display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 20px rgba(37,211,102,0.5);
-      transition: transform 0.2s, box-shadow 0.2s; text-decoration: none;
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+      width: 3.25rem; height: 3.25rem; border-radius: 50%;
+      background: #25D366;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(37,211,102,0.5);
+      text-decoration: none;
     }
-    .wa-float:hover { transform: scale(1.12); box-shadow: 0 6px 30px rgba(37,211,102,0.6); }
+    .wa-float:hover { background: #20b858; }
 
     /* ── Section title ── */
     .s-title { font-family: "Poppins", sans-serif; font-weight: 700; line-height: 1.2; }
@@ -166,20 +169,25 @@
 
 <body class="bg-bglight text-gray-900 font-inter">
 
-  <!-- ════════════════════════════════════════════
-       NAV
-  ═════════════════════════════════════════════ -->
   <nav id="main-nav" class="fixed top-0 inset-x-0 z-50 bg-primary/90 backdrop-blur-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
 
-        <a href="#" class="flex items-center gap-2.5 group flex-shrink-0">
-          <div class="w-9 h-9 bg-accent rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-            <span class="text-white font-extrabold text-lg font-poppins leading-none">S</span>
-          </div>
-          <div>
-            <span class="block text-white font-bold text-sm sm:text-base font-poppins">Sen Grocery Store</span>
-            <span class="block text-accent text-[10px] font-medium tracking-widest">EST. 1995</span>
+        <a href="#" class="flex items-center gap-2.5 flex-shrink-0 group">
+          <img
+            src="./1000207201.jpg"
+            alt="Sen Grocery Store logo"
+            class="nav-logo-img"
+            onerror="this.style.display='none'; document.getElementById('logo-text-fallback').style.display='flex';"
+          />
+          <div id="logo-text-fallback" class="items-center gap-2 hidden">
+            <div class="w-9 h-9 bg-accent rounded-lg flex items-center justify-center shadow-sm">
+              <span class="text-white font-extrabold text-lg font-poppins leading-none">S</span>
+            </div>
+            <div>
+              <span class="block text-white font-bold text-sm sm:text-base font-poppins">Sen Grocery Store</span>
+              <span class="block text-accent text-[10px] font-medium tracking-widest">EST. 1995</span>
+            </div>
           </div>
         </a>
 
@@ -187,6 +195,7 @@
           <a href="#about"      class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">About</a>
           <a href="#categories" class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">Categories</a>
           <a href="#products"   class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">Products</a>
+          <a href="#offers"     class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">Offers</a>
           <a href="#reviews"    class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">Reviews</a>
           <a href="#location"   class="text-gray-300 hover:text-accent text-sm font-medium transition-colors">Location</a>
           <a id="nav-call-btn" href="tel:6296622391" class="btn-primary !py-2 !px-4 !text-sm">
@@ -208,6 +217,7 @@
         <a href="#about"      class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">About</a>
         <a href="#categories" class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">Categories</a>
         <a href="#products"   class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">Products</a>
+        <a href="#offers"     class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">Offers</a>
         <a href="#reviews"    class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">Reviews</a>
         <a href="#location"   class="block text-gray-300 hover:text-accent hover:bg-white/10 text-sm font-medium py-2.5 px-3 rounded-lg transition-all">Location</a>
         <a id="mobile-call-btn" href="tel:6296622391" class="btn-primary mt-2 w-full justify-center">
@@ -220,9 +230,6 @@
     </div>
   </nav>
 
-  <!-- ════════════════════════════════════════════
-       HERO
-  ═════════════════════════════════════════════ -->
   <section id="hero" class="hero-bg min-h-screen flex items-center pt-16">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 text-center w-full">
 
@@ -274,20 +281,17 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       ABOUT
-  ═════════════════════════════════════════════ -->
   <section id="about" class="py-20 sm:py-28 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
 
         <div data-aos="fade-right">
           <span class="badge">Our Story</span>
-          <h2 class="s-title text-3xl sm:text-4xl text-primary mb-5">A Legacy of Trust &amp;<br/>Fresh Groceries</h2>
+          <h2 class="s-title text-3xl sm:text-4xl text-primary mb-5">A Legacy of Trust &<br/>Fresh Groceries</h2>
           <p id="about-text" class="text-gray-600 leading-relaxed text-base sm:text-lg mb-8"></p>
           <div class="flex gap-8 flex-wrap">
             <div>
-              <p class="text-3xl font-extrabold text-primary font-poppins">29+</p>
+              <p class="text-3xl font-extrabold text-primary font-poppins">30+</p>
               <p class="text-xs text-gray-500 mt-0.5">Years of Service</p>
             </div>
             <div class="w-px bg-gray-200 self-stretch"></div>
@@ -317,6 +321,7 @@
               <p class="text-gray-400 text-xs mt-0.5">📍 Landmark: Kumlai Bridge</p>
             </div>
           </div>
+
           <div class="flex items-start gap-4 p-5 bg-bglight rounded-2xl border border-gray-100 hover:shadow-md transition-shadow">
             <div class="w-11 h-11 bg-accent/10 rounded-xl flex items-center justify-center flex-shrink-0">
               <svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -329,6 +334,7 @@
               <p class="text-gray-400 text-xs mt-0.5">Open 7 days a week</p>
             </div>
           </div>
+
           <div class="flex items-start gap-4 p-5 bg-bglight rounded-2xl border border-gray-100 hover:shadow-md transition-shadow">
             <div class="w-11 h-11 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -346,9 +352,6 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       CATEGORIES
-  ═════════════════════════════════════════════ -->
   <section id="categories" class="py-20 sm:py-28 bg-bglight">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12" data-aos="fade-up">
@@ -360,9 +363,6 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       FEATURED PRODUCTS
-  ═════════════════════════════════════════════ -->
   <section id="products" class="py-20 sm:py-28 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12" data-aos="fade-up">
@@ -374,15 +374,23 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       WHY CHOOSE US
-  ═════════════════════════════════════════════ -->
+  <section id="offers" class="py-20 sm:py-28 bg-bglight" style="display:none;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12" data-aos="fade-up">
+        <span class="badge">Special Deals</span>
+        <h2 class="s-title text-3xl sm:text-4xl text-primary">Current Offers</h2>
+        <p class="text-gray-500 mt-3 max-w-md mx-auto text-sm sm:text-base">Grab the best deals at Sen Grocery Store</p>
+      </div>
+      <div id="offers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+  </section>
+
   <section id="why-us" class="py-20 sm:py-28 bg-primary">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-14" data-aos="fade-up">
         <span class="inline-block bg-accent/20 border border-accent/30 text-accent rounded-full px-5 py-1.5 text-xs font-semibold font-poppins uppercase tracking-widest mb-4">Why Us</span>
         <h2 class="s-title text-3xl sm:text-4xl text-white">Why Choose Sen Grocery?</h2>
-        <p class="text-gray-400 mt-3 max-w-md mx-auto text-sm sm:text-base">Three decades of quality, trust and community service</p>
+        <p class="text-gray-400 mt-3 max-w-md mx-auto text-sm sm:text-base">30+ years of quality, trust and community service</p>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div data-aos="fade-up" data-aos-delay="0"   class="why-card bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
@@ -403,15 +411,12 @@
         <div data-aos="fade-up" data-aos-delay="300" class="why-card bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
           <div class="text-4xl mb-5">🏆</div>
           <h3 class="text-white font-bold text-lg font-poppins mb-3">Trusted Since 1995</h3>
-          <p class="text-gray-400 text-sm leading-relaxed">Nearly 30 years serving the community with honesty, quality, and genuine care.</p>
+          <p class="text-gray-400 text-sm leading-relaxed">30+ years serving the community with honesty, quality, and genuine care.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       GALLERY
-  ═════════════════════════════════════════════ -->
   <section id="gallery-section" class="py-20 sm:py-28 bg-bglight">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-10" data-aos="fade-up">
@@ -423,9 +428,6 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       REVIEWS
-  ═════════════════════════════════════════════ -->
   <section id="reviews" class="py-20 sm:py-28 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12" data-aos="fade-up">
@@ -442,23 +444,17 @@
           <p class="text-gray-500 text-sm mb-6">Visited our store? Let your neighbours know!</p>
           <form id="review-form" novalidate>
             <div class="mb-4">
-              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">
-                Your Name <span class="text-red-400">*</span>
-              </label>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Your Name <span class="text-red-400">*</span></label>
               <input id="review-name" type="text" class="r-input" placeholder="e.g. Rahul Sharma"
                      required maxlength="100" autocomplete="name" />
             </div>
             <div class="mb-5">
-              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">
-                Your Review <span class="text-red-400">*</span>
-              </label>
+              <label class="block text-sm font-semibold text-gray-700 font-poppins mb-1.5">Your Review <span class="text-red-400">*</span></label>
               <textarea id="review-text" rows="4" class="r-input resize-none"
                         placeholder="Tell us about your experience at Sen Grocery…"
                         required maxlength="500"></textarea>
             </div>
-            <button id="review-submit-btn" type="submit" class="btn-primary w-full justify-center">
-              Submit Review
-            </button>
+            <button id="review-submit-btn" type="submit" class="btn-primary w-full justify-center">Submit Review</button>
             <p id="review-msg" class="mt-3 text-sm font-medium"></p>
           </form>
         </div>
@@ -466,9 +462,6 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       LOCATION
-  ═════════════════════════════════════════════ -->
   <section id="location" class="py-20 sm:py-28 bg-bglight">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12" data-aos="fade-up">
@@ -528,12 +521,10 @@
     </div>
   </section>
 
-  <!-- ════════════════════════════════════════════
-       FOOTER
-  ═════════════════════════════════════════════ -->
   <footer class="bg-primary py-14">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 mb-10">
+
         <div>
           <div class="flex items-center gap-2.5 mb-4">
             <div class="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
@@ -546,16 +537,19 @@
           </div>
           <p class="text-gray-400 text-sm leading-relaxed max-w-xs">Your trusted neighbourhood grocery store for fresh produce and daily essentials at the best prices.</p>
         </div>
+
         <div>
           <h4 class="text-white font-semibold font-poppins mb-4 text-sm uppercase tracking-wider">Quick Links</h4>
           <ul class="space-y-2.5">
             <li><a href="#about"      class="text-gray-400 hover:text-accent text-sm transition-colors">About Us</a></li>
             <li><a href="#categories" class="text-gray-400 hover:text-accent text-sm transition-colors">Categories</a></li>
             <li><a href="#products"   class="text-gray-400 hover:text-accent text-sm transition-colors">Products</a></li>
+            <li><a href="#offers"     class="text-gray-400 hover:text-accent text-sm transition-colors">Offers</a></li>
             <li><a href="#reviews"    class="text-gray-400 hover:text-accent text-sm transition-colors">Reviews</a></li>
             <li><a href="#location"   class="text-gray-400 hover:text-accent text-sm transition-colors">Find Us</a></li>
           </ul>
         </div>
+
         <div>
           <h4 class="text-white font-semibold font-poppins mb-4 text-sm uppercase tracking-wider">Contact</h4>
           <div class="space-y-3">
@@ -574,6 +568,16 @@
               </svg>
               WhatsApp Us
             </a>
+
+            <a href="https://www.instagram.com/sengrocerystore?igsh=MWJ1MGt3Y21nOWE2ZQ=="
+               target="_blank" rel="noopener"
+               class="flex items-center gap-2 text-gray-400 hover:text-pink-400 text-sm transition-colors">
+              <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+              @sengrocerystore
+            </a>
+
             <div class="flex items-start gap-2 text-gray-400 text-sm">
               <svg class="h-4 w-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -584,6 +588,7 @@
           </div>
         </div>
       </div>
+
       <div class="border-t border-white/10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-3">
         <p class="text-gray-500 text-xs">© 2025 Sen Grocery Store. All rights reserved. Established 1995.</p>
         <a href="./admin.html" class="text-gray-600 hover:text-gray-400 text-xs transition-colors">Admin</a>
@@ -591,11 +596,13 @@
     </div>
   </footer>
 
-  <!-- Floating WhatsApp -->
   <a id="whatsapp-float"
      href="https://wa.me/916296622391?text=Hi%2C%20I%20want%20to%20check%20product%20availability"
-     target="_blank" rel="noopener" class="wa-float" aria-label="Chat on WhatsApp">
-    <svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+     target="_blank"
+     rel="noopener noreferrer"
+     class="wa-float"
+     aria-label="Chat with us on WhatsApp">
+    <svg class="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
       <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.533 5.859L.073 23.486a.5.5 0 00.617.617l5.626-1.462A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.83 9.83 0 01-5.028-1.383l-.36-.214-3.732.97.993-3.62-.234-.373A9.817 9.817 0 012.182 12C2.182 6.56 6.56 2.182 12 2.182c5.439 0 9.818 4.378 9.818 9.818 0 5.439-4.379 9.818-9.818 9.818z"/>
     </svg>
