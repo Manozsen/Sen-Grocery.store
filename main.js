@@ -295,7 +295,7 @@ async function loadGallery() {
 
   let imgs = [];
   try {
-    const snap = await getDocs(collection(db, "storeImages"));
+    const snap = await getDocs(collection(db, "gallery"));
     snap.forEach(d => imgs.push({ id: d.id, ...d.data() }));
   } catch {
     imgs = [];
