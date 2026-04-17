@@ -10,8 +10,7 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-// ── Settings fallback (real shop data — kept intentionally) ──
-// Categories, products, reviews have NO fallback per spec.
+// ── Settings fallback (shop-specific, kept by design) ─────────
 const SETTINGS_FALLBACK = {
   tagline:   "Trusted Grocery Store Since 1995",
   aboutText: "Sen Grocery Store has been proudly serving the community of Baradighi, Mal, Jalpaiguri since 1995. Founded with a vision to bring the freshest groceries and daily essentials to every household, we have grown from a small corner shop into the most trusted grocery destination in the region. For nearly three decades, our commitment to quality, affordability, and genuine customer care has never wavered.",
@@ -24,7 +23,7 @@ const SETTINGS_FALLBACK = {
   heroImage: "",
 };
 
-// ── Utilities ────────────────────────────────────────────────
+// ── Utilities ─────────────────────────────────────────────────
 function setText(id, val) {
   const e = $(id);
   if (e) e.textContent = val ?? "";
@@ -52,13 +51,11 @@ function showMsg(elId, text, ok) {
   const e = $(elId);
   if (!e) return;
   e.textContent = text;
-  e.className = ok
-    ? "mt-3 text-sm font-medium text-green-600"
-    : "mt-3 text-sm font-medium text-red-500";
+  e.className = ok ? "mt-3 text-sm font-medium text-green-600" : "mt-3 text-sm font-medium text-red-500";
   setTimeout(() => { e.textContent = ""; }, 5000);
 }
 
-// Spinner HTML for loading grids
+// Loading spinner for grids
 function spinnerHTML() {
   return `<div class="col-span-full flex justify-center items-center py-12 gap-2 text-gray-400">
     <svg class="animate-spin h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24">
@@ -69,7 +66,7 @@ function spinnerHTML() {
   </div>`;
 }
 
-// Empty state HTML — used when Firestore collection is empty
+// Generic empty state
 function emptyHTML(message) {
   return `<div class="col-span-full flex flex-col items-center justify-center py-14 gap-3 text-gray-400">
     <svg class="h-12 w-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
@@ -79,7 +76,7 @@ function emptyHTML(message) {
   </div>`;
 }
 
-// ── Store open/closed indicator ───────────────────────────────
+// ── Open/closed indicator ──────────────────────────────────────
 function parseTime(t) {
   const m = (t || "").match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return null;
@@ -106,17 +103,17 @@ function updateOpenIndicator(openTime, closeTime) {
        <span class="text-red-500 text-sm font-semibold">Currently Closed</span>`;
 }
 
-// ── Apply hero background image from Firestore ────────────────
-function applyHeroImage(heroImageUrl) {
-  const heroSection = $("hero");
-  if (!heroSection || !heroImageUrl?.trim()) return;
-  heroSection.style.backgroundImage =
-    `linear-gradient(160deg, rgba(10,37,64,0.85) 0%, rgba(10,37,64,0.92) 100%), url('${heroImageUrl}')`;
-  heroSection.style.backgroundSize     = "cover";
-  heroSection.style.backgroundPosition = "center";
+// ── Hero image from Firestore ──────────────────────────────────
+function applyHeroImage(url) {
+  const section = $("hero");
+  if (!section || !url?.trim()) return;
+  section.style.backgroundImage =
+    `linear-gradient(160deg, rgba(10,37,64,0.85) 0%, rgba(10,37,64,0.92) 100%), url('${url}')`;
+  section.style.backgroundSize     = "cover";
+  section.style.backgroundPosition = "center";
 }
 
-// ── 1. Settings ──────────────────────────────────────────────
+// ── 1. Settings ───────────────────────────────────────────────
 async function loadSettings() {
   let s = { ...SETTINGS_FALLBACK };
   try {
@@ -128,8 +125,7 @@ async function loadSettings() {
 
   applyHeroImage(s.heroImage || "");
 
-  const tagline = s.tagline?.trim() || "Trusted Grocery Store Since 1995";
-  setText("hero-tagline",     tagline);
+  setText("hero-tagline",     s.tagline?.trim() || "Trusted Grocery Store Since 1995");
   setText("about-text",       s.aboutText);
   setText("store-address",    s.address);
   setText("location-address", s.address);
@@ -140,13 +136,11 @@ async function loadSettings() {
   setText("location-timing", timing);
 
   const phone = s.phone || "6296622391";
-  setHref(
-    ["call-btn", "nav-call-btn", "mobile-call-btn", "about-call-btn", "footer-call-btn"],
-    `tel:${phone}`
-  );
+  setHref(["call-btn", "nav-call-btn", "mobile-call-btn", "about-call-btn", "footer-call-btn"], `tel:${phone}`);
 
   const waNum = s.whatsapp || "6296622391";
   const waMsg = encodeURIComponent("Hi, I want to check product availability");
+  // Use 91 prefix (India country code) — required for wa.me to route correctly
   setHref(["whatsapp-float", "footer-wa-btn"], `https://wa.me/91${waNum}?text=${waMsg}`);
 
   const mapBtn = $("map-link-btn");
@@ -155,7 +149,7 @@ async function loadSettings() {
   updateOpenIndicator(s.openTime, s.closeTime);
 }
 
-// ── 2. Categories — NO hardcoded fallback ────────────────────
+// ── 2. Categories ─────────────────────────────────────────────
 async function loadCategories() {
   const grid = $("categories-grid");
   if (!grid) return;
@@ -171,11 +165,7 @@ async function loadCategories() {
   }
 
   grid.innerHTML = "";
-
-  if (!cats.length) {
-    grid.innerHTML = emptyHTML("No categories available yet.");
-    return;
-  }
+  if (!cats.length) { grid.innerHTML = emptyHTML("No categories available yet."); return; }
 
   cats.forEach((cat, i) => {
     const ph = `https://placehold.co/400x400/0A2540/2EC4B6?text=${encodeURIComponent(cat.name)}`;
@@ -184,13 +174,9 @@ async function loadCategories() {
     div.setAttribute("data-aos", "fade-up");
     div.setAttribute("data-aos-delay", String(i * 60));
     div.innerHTML = `
-      <img
-        src="${escAttr(cat.imageUrl || ph)}"
-        alt="${escAttr(cat.name)}"
-        class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        loading="lazy"
-        onerror="this.src='${ph}'"
-      />
+      <img src="${escAttr(cat.imageUrl || ph)}" alt="${escAttr(cat.name)}"
+           class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+           loading="lazy" onerror="this.src='${ph}'" />
       <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
       <div class="absolute bottom-0 left-0 right-0 p-3">
         <h3 class="text-white font-semibold text-sm sm:text-base font-poppins">${esc(cat.name)}</h3>
@@ -201,7 +187,7 @@ async function loadCategories() {
   if (window.AOS) window.AOS.refresh();
 }
 
-// ── 3. Featured Products — NO hardcoded fallback ─────────────
+// ── 3. Featured Products ──────────────────────────────────────
 async function loadProducts() {
   const grid = $("products-grid");
   if (!grid) return;
@@ -217,11 +203,7 @@ async function loadProducts() {
   }
 
   grid.innerHTML = "";
-
-  if (!prods.length) {
-    grid.innerHTML = emptyHTML("No featured products available yet.");
-    return;
-  }
+  if (!prods.length) { grid.innerHTML = emptyHTML("No featured products available yet."); return; }
 
   prods.forEach((p, i) => {
     const ph = `https://placehold.co/400x400/F8F9FA/0A2540?text=${encodeURIComponent(p.name)}`;
@@ -231,13 +213,9 @@ async function loadProducts() {
     div.setAttribute("data-aos-delay", String(i * 70));
     div.innerHTML = `
       <div class="aspect-square overflow-hidden bg-gray-50">
-        <img
-          src="${escAttr(p.imageUrl || ph)}"
-          alt="${escAttr(p.name)}"
-          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
-          loading="lazy"
-          onerror="this.src='${ph}'"
-        />
+        <img src="${escAttr(p.imageUrl || ph)}" alt="${escAttr(p.name)}"
+             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
+             loading="lazy" onerror="this.src='${ph}'" />
       </div>
       <div class="p-4 text-center">
         <h3 class="font-semibold text-gray-800 font-poppins text-sm sm:text-base truncate">${esc(p.name)}</h3>
@@ -249,7 +227,67 @@ async function loadProducts() {
   if (window.AOS) window.AOS.refresh();
 }
 
-// ── 4. Store Gallery ─────────────────────────────────────────
+// ── 4. Offers (NEW) ───────────────────────────────────────────
+async function loadOffers() {
+  const section = $("offers");
+  const grid    = $("offers-grid");
+  if (!section || !grid) return;
+
+  let offers = [];
+  try {
+    const q    = query(collection(db, "offers"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    snap.forEach(d => offers.push({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error("[Offers] Load failed:", err);
+    // Don't show section on error — fail silently on frontend
+    return;
+  }
+
+  // Hide section entirely when there are no offers
+  if (!offers.length) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "";   // show section
+  grid.innerHTML = "";
+
+  offers.forEach((offer, i) => {
+    const div = document.createElement("div");
+    div.className = "bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden";
+    div.setAttribute("data-aos", "fade-up");
+    div.setAttribute("data-aos-delay", String(i * 80));
+
+    // Build image block only if imageUrl is present
+    const imgBlock = offer.imageUrl
+      ? `<div class="w-full h-44 overflow-hidden bg-gray-50">
+           <img src="${escAttr(offer.imageUrl)}" alt="${escAttr(offer.title)}"
+                class="w-full h-full object-cover"
+                loading="lazy"
+                onerror="this.parentElement.style.display='none'" />
+         </div>`
+      : "";
+
+    div.innerHTML = `
+      ${imgBlock}
+      <div class="p-5">
+        <div class="inline-block bg-accent/10 text-accent text-xs font-semibold font-poppins
+                    px-3 py-1 rounded-full mb-3 uppercase tracking-wide">
+          Special Offer
+        </div>
+        <h3 class="font-bold text-primary font-poppins text-base mb-2 leading-snug">${esc(offer.title)}</h3>
+        ${offer.description
+          ? `<p class="text-gray-600 text-sm leading-relaxed">${esc(offer.description)}</p>`
+          : ""}
+      </div>`;
+    grid.appendChild(div);
+  });
+
+  if (window.AOS) window.AOS.refresh();
+}
+
+// ── 5. Gallery ────────────────────────────────────────────────
 async function loadGallery() {
   const section = $("gallery-section");
   const gallery = $("store-gallery");
@@ -263,28 +301,21 @@ async function loadGallery() {
     imgs = [];
   }
 
-  if (!imgs.length) {
-    section.style.display = "none";
-    return;
-  }
+  if (!imgs.length) { section.style.display = "none"; return; }
 
   gallery.innerHTML = "";
   imgs.forEach(img => {
     const div = document.createElement("div");
     div.className = "flex-shrink-0 w-64 h-48 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow snap-start";
     div.innerHTML = `
-      <img
-        src="${escAttr(img.imageUrl)}"
-        alt="Store image"
-        class="w-full h-full object-cover hover:scale-105 transition-transform duration-400"
-        loading="lazy"
-        onerror="this.parentElement.remove()"
-      />`;
+      <img src="${escAttr(img.imageUrl)}" alt="Store image"
+           class="w-full h-full object-cover hover:scale-105 transition-transform duration-400"
+           loading="lazy" onerror="this.parentElement.remove()" />`;
     gallery.appendChild(div);
   });
 }
 
-// ── 5. Reviews — NO hardcoded fallback ───────────────────────
+// ── 6. Reviews ────────────────────────────────────────────────
 async function loadReviews() {
   const grid = $("reviews-grid");
   if (!grid) return;
@@ -299,16 +330,13 @@ async function loadReviews() {
   }
 
   grid.innerHTML = "";
-
   if (!reviews.length) {
     grid.innerHTML = `<p class="col-span-full text-center text-gray-400 py-8">No reviews yet — be the first to share your experience!</p>`;
     return;
   }
 
   reviews.forEach((r, i) => {
-    const initials = (r.name || "?")
-      .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-
+    const initials = (r.name || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
     const div = document.createElement("div");
     div.className = "bg-bglight rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-shadow duration-300";
     div.setAttribute("data-aos", "fade-up");
@@ -330,7 +358,7 @@ async function loadReviews() {
   if (window.AOS) window.AOS.refresh();
 }
 
-// ── 6. Review Submission Form ─────────────────────────────────
+// ── 7. Review Submission ──────────────────────────────────────
 function initReviewForm() {
   const form = $("review-form");
   if (!form) return;
@@ -341,24 +369,14 @@ function initReviewForm() {
     const text = $("review-text").value.trim();
     const btn  = $("review-submit-btn");
 
-    if (!name || !text) {
-      showMsg("review-msg", "Please fill in both fields.", false);
-      return;
-    }
-    if (text.length < 10) {
-      showMsg("review-msg", "Review must be at least 10 characters.", false);
-      return;
-    }
+    if (!name || !text) { showMsg("review-msg", "Please fill in both fields.", false); return; }
+    if (text.length < 10) { showMsg("review-msg", "Review must be at least 10 characters.", false); return; }
 
     btn.disabled    = true;
     btn.textContent = "Submitting…";
 
     try {
-      await addDoc(collection(db, "reviews"), {
-        name,
-        text,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(collection(db, "reviews"), { name, text, createdAt: serverTimestamp() });
       showMsg("review-msg", "✓ Thank you! Your review has been submitted.", true);
       form.reset();
       await loadReviews();
@@ -372,7 +390,7 @@ function initReviewForm() {
   });
 }
 
-// ── 7. Mobile Nav ────────────────────────────────────────────
+// ── 8. Mobile Nav ─────────────────────────────────────────────
 function initNav() {
   const toggle = $("nav-toggle");
   const menu   = $("nav-menu");
@@ -389,7 +407,7 @@ function initNav() {
   }
 }
 
-// ── 8. Service Worker ────────────────────────────────────────
+// ── 9. Service Worker ─────────────────────────────────────────
 function registerSW() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js")
@@ -398,13 +416,21 @@ function registerSW() {
   }
 }
 
-// ── BOOT ─────────────────────────────────────────────────────
+// ── BOOT ──────────────────────────────────────────────────────
 async function init() {
   registerSW();
   initNav();
 
   await loadSettings();
-  await Promise.all([loadCategories(), loadProducts(), loadGallery(), loadReviews()]);
+
+  // Load all content sections in parallel
+  await Promise.all([
+    loadCategories(),
+    loadProducts(),
+    loadOffers(),
+    loadGallery(),
+    loadReviews(),
+  ]);
 
   initReviewForm();
 
